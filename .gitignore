@@ -56,3 +56,6 @@ pnpm-debug.log*
 
 
 package-lock.json
+/ehcache/
+/data/static-resource/
+/kettle/admin/

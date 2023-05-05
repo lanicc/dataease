@@ -34,8 +34,6 @@ public class MapUtils {
         MapUtils.areaMappingGlobalMapper = areaMappingGlobalMapper;
     }
 
-    private static final String featureDir = "/opt/dataease/data/feature/";
-
     public static String formatCode(String code) {
         return code;
     }

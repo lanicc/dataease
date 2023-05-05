@@ -25,6 +25,9 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
+import static io.dataease.commons.constants.StaticResourceConstants.FILE_SEPARATOR;
+import static io.dataease.commons.constants.StaticResourceConstants.WORK_DIR;
+
 /**
  * Author: wangjiahao
  * Date: 2022/4/24
@@ -33,7 +36,7 @@ import java.util.Map;
 @Service
 public class StaticResourceService {
 
-    private final Path staticDir = Paths.get("/opt/dataease/data/static-resource/");
+    private final Path staticDir = Paths.get(WORK_DIR, FILE_SEPARATOR);
 
     public void upload(String fileId, MultipartFile file) {
         // check if the path is valid (not outside staticDir)

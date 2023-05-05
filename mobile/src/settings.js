@@ -3,7 +3,7 @@ module.exports = {
     TokenKey: 'Authorization',
     RefreshTokenKey: 'refreshauthorization',
     LinkTokenKey: 'LINK-PWD-TOKEN',
-    title: 'DataEase',
+    title: 'EffectBI',
     WHITE_LIST: [
       '/api/auth/login',
       '/api/auth/getPublicKey',
@@ -14,4 +14,3 @@ module.exports = {
     RECENT_KEY: 'recently',
     USER_INFO_KEY: 'user-info'
   }
-  

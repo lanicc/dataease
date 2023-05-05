@@ -9,12 +9,12 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
 
-    @Value("${geo.custom.rootpath:file:/opt/dataease/data/custom/}")
+    @Value("${geo.custom.rootpath:/opt/dataease/data/custom/}")
     private String geoPath;
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
 
-        registry.addResourceHandler("/geo/**").addResourceLocations(geoPath);
+        registry.addResourceHandler("/geo/**").addResourceLocations("file:" + geoPath);
     }
 }

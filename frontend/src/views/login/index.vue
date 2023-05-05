@@ -30,17 +30,8 @@
               size="default"
             >
 
-              <div class="login-logo">
-                <svg-icon
-                  v-if="!loginLogoUrl && axiosFinished"
-                  icon-class="DataEase"
-                  custom-class="login-logo-icon"
-                />
-                <img
-                  v-if="loginLogoUrl && axiosFinished"
-                  :src="loginLogoUrl"
-                  alt=""
-                >
+              <div class="login-logo" style="font-size: xxx-large">
+                EffectBI
               </div>
               <div
                 v-if="uiInfo && uiInfo['ui.loginTitle'] && uiInfo['ui.loginTitle'].paramValue"
@@ -52,7 +43,7 @@
                 v-else
                 class="login-welcome"
               >
-                {{ $t('login.welcome') + (uiInfo && uiInfo['ui.title'] && uiInfo['ui.title'].paramValue || ' DataEase') }}
+                {{ $t('login.welcome') + (uiInfo && uiInfo['ui.title'] && uiInfo['ui.title'].paramValue || ' EffectBI') }}
               </div>
               <div class="login-form">
                 <el-form-item v-if="radioTypes.length > 1">
@@ -431,6 +422,7 @@ export default {
     },
     showLoginImage(uiInfo) {
       this.uiInfo = getSysUI()
+      console.log(this.uiInfo)
       if (!this.uiInfo || Object.keys(this.uiInfo).length === 0) {
         this.uiInfo = uiInfo
       }
@@ -452,6 +444,7 @@ export default {
           this.footContent = content
         }
       }
+      console.log(this.loginImageUrl)
     },
     initCache() {
       this.clearLocalStorage.forEach(item => {

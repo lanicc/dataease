@@ -3,19 +3,9 @@
     <div
       v-loading="!axiosFinished"
       class="log"
+      style="color: blue;"
     >
-      <svg-icon
-        v-if="!logoUrl && axiosFinished"
-        icon-class="DataEase"
-        custom-class="top-nav-logo-icon"
-      />
-      <img
-        v-if="logoUrl && axiosFinished"
-        :src="logoUrl"
-        width="140"
-        alt=""
-        style="padding-top: 10px;"
-      >
+      EffectBI
     </div>
     <el-menu
       class="de-top-menu"
@@ -51,13 +41,13 @@
         style="height: 100%;padding: 0 8px;"
         class="right-menu-item hover-effect"
       >
-        <a
-          :href="helpLink"
-          target="_blank"
-          style="display: flex;height: 100%;width: 100%;justify-content: center;align-items: center;"
-        >
-          <svg-icon icon-class="docs" />
-        </a>
+<!--        <a-->
+<!--          :href="helpLink"-->
+<!--          target="_blank"-->
+<!--          style="display: flex;height: 100%;width: 100%;justify-content: center;align-items: center;"-->
+<!--        >-->
+<!--          <svg-icon icon-class="docs" />-->
+<!--        </a>-->
       </div>
 
       <el-dropdown
@@ -92,9 +82,9 @@
             <el-dropdown-item>{{ $t('user.change_password') }}</el-dropdown-item>
           </router-link>
 
-          <router-link to="/about/index">
-            <el-dropdown-item>{{ $t('commons.about_us') }}</el-dropdown-item>
-          </router-link>
+<!--          <router-link to="/about/index">-->
+<!--            <el-dropdown-item>{{ $t('commons.about_us') }}</el-dropdown-item>-->
+<!--          </router-link>-->
           <el-dropdown-item
             v-if="!isOtherPlatform"
             divided

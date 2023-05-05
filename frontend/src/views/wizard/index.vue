@@ -22,108 +22,108 @@
         <el-row class="content_top_banner">
           <div class="top_banner_content">
             <div class="hint_head">{{ $t('wizard.welcome_title') }}</div>
-            <div class="hint_content">{{ $t('wizard.welcome_hint') }}</div>
+<!--            <div class="hint_content">{{ $t('wizard.welcome_hint') }}</div>-->
           </div>
           <svg-icon
             class="top_banner_img"
             icon-class="wizard_main_bg_inner"
           />
         </el-row>
-        <el-row class="top_banner_card">
-          <wizard-card :details="cardList[0]"/>
-          <wizard-card
-            :details="cardList[1]"
-            style="margin:0 24px 0 24px"
-          />
-          <wizard-card-enterprise :details="cardList[2]"/>
-        </el-row>
-        <el-row class="content_middle">
-          <div class="content_middle_left">
-            <el-row>
-              <span class="content_middle_title">{{ $t('wizard.teaching_video') }}</span>
-              <div class="content_middle_more"><a
-                target="_blank"
-                href="https://space.bilibili.com/510493147/channel/collectiondetail?sid=262774"
-              >{{ $t('wizard.more') }}<i class="el-icon-arrow-right"/></a></div>
-            </el-row>
-            <el-row style="margin-top: 12px">
-              <video-card :details="videoList[0]"/>
-              <video-card
-                style="margin:0 12px 0 12px"
-                :details="videoList[1]"
-              />
-              <video-card :details="videoList[2]"/>
-            </el-row>
-          </div>
-          <div class="content_middle_right">
-            <el-row>
-              <span class="content_middle_title">{{ $t('wizard.latest_developments') }}</span>
-              <div class="content_middle_more"><a
-                target="_blank"
-                href="https://blog.fit2cloud.com/categories/dataease"
-              >{{ $t('wizard.more') }}<i class="el-icon-arrow-right"/></a></div>
-            </el-row>
-            <el-row>
-              <ul class="ul-custom">
-                <li
-                  v-for="blogItem in blogsInfo"
-                  :key="blogItem.title"
-                  class="li-custom"
-                ><a
-                  target="_blank"
-                  class="li-a"
-                  :href="blogItem.href"
-                  :title="blogItem.title"
-                >{{ blogItem.title }}</a></li>
-              </ul>
-            </el-row>
-          </div>
-        </el-row>
+<!--        <el-row class="top_banner_card">-->
+<!--          <wizard-card :details="cardList[0]"/>-->
+<!--          <wizard-card-->
+<!--            :details="cardList[1]"-->
+<!--            style="margin:0 24px 0 24px"-->
+<!--          />-->
+<!--          <wizard-card-enterprise :details="cardList[2]"/>-->
+<!--        </el-row>-->
+<!--        <el-row class="content_middle">-->
+<!--          <div class="content_middle_left">-->
+<!--            <el-row>-->
+<!--              <span class="content_middle_title">{{ $t('wizard.teaching_video') }}</span>-->
+<!--              <div class="content_middle_more"><a-->
+<!--                target="_blank"-->
+<!--                href="https://space.bilibili.com/510493147/channel/collectiondetail?sid=262774"-->
+<!--              >{{ $t('wizard.more') }}<i class="el-icon-arrow-right"/></a></div>-->
+<!--            </el-row>-->
+<!--            <el-row style="margin-top: 12px">-->
+<!--              <video-card :details="videoList[0]"/>-->
+<!--              <video-card-->
+<!--                style="margin:0 12px 0 12px"-->
+<!--                :details="videoList[1]"-->
+<!--              />-->
+<!--              <video-card :details="videoList[2]"/>-->
+<!--            </el-row>-->
+<!--          </div>-->
+<!--          <div class="content_middle_right">-->
+<!--            <el-row>-->
+<!--              <span class="content_middle_title">{{ $t('wizard.latest_developments') }}</span>-->
+<!--              <div class="content_middle_more"><a-->
+<!--                target="_blank"-->
+<!--                href="https://blog.fit2cloud.com/categories/dataease"-->
+<!--              >{{ $t('wizard.more') }}<i class="el-icon-arrow-right"/></a></div>-->
+<!--            </el-row>-->
+<!--            <el-row>-->
+<!--              <ul class="ul-custom">-->
+<!--                <li-->
+<!--                  v-for="blogItem in blogsInfo"-->
+<!--                  :key="blogItem.title"-->
+<!--                  class="li-custom"-->
+<!--                ><a-->
+<!--                  target="_blank"-->
+<!--                  class="li-a"-->
+<!--                  :href="blogItem.href"-->
+<!--                  :title="blogItem.title"-->
+<!--                >{{ blogItem.title }}</a></li>-->
+<!--              </ul>-->
+<!--            </el-row>-->
+<!--          </div>-->
+<!--        </el-row>-->
 
-        <el-row class="content_bottom">
-          <div class="content_bottom_contact">
-            <el-row class="contact_title">
-              <span>{{ $t('wizard.contact_us') }}</span>
-            </el-row>
-            <el-row class="contact_content">
-              <span>{{ $t('wizard.email') }}dataease@fit2cloud.com</span>
-            </el-row>
-            <el-row class="contact_content">
-              <span>{{ $t('wizard.tel') }}400-052-0755</span>
-            </el-row>
-            <el-row class="contact_content">
-              {{ $t('wizard.web') }}<a
-              style="text-decoration:underline;"
-              target="_blank"
-              href="https://www.dataease.io"
-            >www.dataease.io</a>
-            </el-row>
-          </div>
+<!--        <el-row class="content_bottom">-->
+<!--          <div class="content_bottom_contact">-->
+<!--            <el-row class="contact_title">-->
+<!--              <span>{{ $t('wizard.contact_us') }}</span>-->
+<!--            </el-row>-->
+<!--            <el-row class="contact_content">-->
+<!--              <span>{{ $t('wizard.email') }}dataease@fit2cloud.com</span>-->
+<!--            </el-row>-->
+<!--            <el-row class="contact_content">-->
+<!--              <span>{{ $t('wizard.tel') }}400-052-0755</span>-->
+<!--            </el-row>-->
+<!--            <el-row class="contact_content">-->
+<!--              {{ $t('wizard.web') }}<a-->
+<!--              style="text-decoration:underline;"-->
+<!--              target="_blank"-->
+<!--              href="https://www.dataease.io"-->
+<!--            >www.dataease.io</a>-->
+<!--            </el-row>-->
+<!--          </div>-->
 
-          <div class="content_bottom_qr_code">
-            <div class="contact_wechat_train">
-              <div class="contact_title_qr">{{ $t('wizard.f2c_train') }}</div>
-              <img
-                class="contact_wechat_train_img"
-                src="@/assets/wizard_wechat-train.png"
-              >
-            </div>
-            <div class="contact_wechat_official">
-              <div class="contact_title_qr">{{ $t('wizard.weChat_official_account') }}</div>
-              <img
-                class="contact_wechat_official_img"
-                src="@/assets/wizard_wechat-official.jpeg"
-              >
-            </div>
-            <div class="contact_wechat_group">
-              <div class="contact_title_qr">{{ $t('wizard.technical_group') }}</div>
-              <img
-                class="contact_wechat_group_img"
-                src="../../assets/wizard_wechat-group.png"
-              >
-            </div>
-          </div>
-        </el-row>
+<!--          <div class="content_bottom_qr_code">-->
+<!--            <div class="contact_wechat_train">-->
+<!--              <div class="contact_title_qr">{{ $t('wizard.f2c_train') }}</div>-->
+<!--              <img-->
+<!--                class="contact_wechat_train_img"-->
+<!--                src="@/assets/wizard_wechat-train.png"-->
+<!--              >-->
+<!--            </div>-->
+<!--            <div class="contact_wechat_official">-->
+<!--              <div class="contact_title_qr">{{ $t('wizard.weChat_official_account') }}</div>-->
+<!--              <img-->
+<!--                class="contact_wechat_official_img"-->
+<!--                src="@/assets/wizard_wechat-official.jpeg"-->
+<!--              >-->
+<!--            </div>-->
+<!--            <div class="contact_wechat_group">-->
+<!--              <div class="contact_title_qr">{{ $t('wizard.technical_group') }}</div>-->
+<!--              <img-->
+<!--                class="contact_wechat_group_img"-->
+<!--                src="../../assets/wizard_wechat-group.png"-->
+<!--              >-->
+<!--            </div>-->
+<!--          </div>-->
+<!--        </el-row>-->
 
       </el-row>
     </el-row>
