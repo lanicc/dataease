@@ -1,6 +1,6 @@
 <template>
     <view class="page dataease-main">
-        
+
         <view>
             <uni-card  >
                 <view class="uni-flex uni-row">
@@ -13,8 +13,8 @@
                         </view>
                         <view class="uni-flex uni-row" style="padding-left: 20rpx;">
                             <view class="text" style="-webkit-flex: 1;flex: 1;">{{roleNames}}</view>
-                            <view class="more-info" style="-webkit-flex: 1;flex: 1;color: #409eff;" @click="showMore">{{$t('me.moreInfo')}}</view>
-                            
+<!--                            <view class="more-info" style="-webkit-flex: 1;flex: 1;color: #409eff;" @click="showMore">{{$t('me.moreInfo')}}</view>-->
+
                         </view>
                     </view>
                 </view>
@@ -23,9 +23,9 @@
 
         <view>
             <uni-list>
-                
+
                 <uni-list-item :title="$t('navigate.language')" clickable  showArrow thumb="../../../static/language.png" thumb-size="base" @click="toLanguage" :rightText="languageName" />
-                <uni-list-item :title="$t('navigate.about')" clickable  showArrow thumb="../../../static/about.png" thumb-size="base" @click="toAbout" :rightText="$t('me.systemInfo')" />
+<!--                <uni-list-item :title="$t('navigate.about')" clickable  showArrow thumb="../../../static/about.png" thumb-size="base" @click="toAbout" :rightText="$t('me.systemInfo')" />-->
             </uni-list>
         </view>
 
@@ -50,7 +50,7 @@ export default {
         this.roleNames = this.user.roles.map(role => role.name).toString()
     },
     onLoad(event) {
-        
+
     },
     computed: {
         languageName() {
@@ -94,7 +94,7 @@ export default {
                 });
             }
             logout().then(res => {callBack()}).catch(e => {callBack()})
-            
+
         }
     }
 }
@@ -102,13 +102,13 @@ export default {
 
 <style scoped>
 .dataease-main {
-    
+
     position: fixed;
     left: var(--window-left);
     right: var(--window-right);
     padding: 5px;
     height: calc(100vh - 90px);
-    
+
 }
 .uni-card {
     margin: 0px;

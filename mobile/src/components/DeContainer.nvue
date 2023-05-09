@@ -7,7 +7,7 @@
         <view class="text dataease-main">
             <slot></slot>
         </view>
-        		
+
 	</view>
 </template>
 <script>
@@ -21,16 +21,16 @@
 	// #endif
 	export default {
 		props: {
-			
+
 		},
 		data() {
 			return {
-				
+
 			}
 		},
 		onShareAppMessage() {
 			return {
-				title: '欢迎体验dataease-mobile',
+				title: '欢迎体验',
 				path: '/pages/tabBar/home/index'
 			}
 		},
@@ -41,11 +41,11 @@
 		},
 		// #ifdef H5
 		watch: {
-			
+
 		},
 		// #endif
 		methods: {
-			
+
 		}
 	}
 </script>

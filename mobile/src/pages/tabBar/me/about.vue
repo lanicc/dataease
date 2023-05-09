@@ -5,20 +5,20 @@
     </uni-list>
     <swiper  class="swiper-box" style="flex: 1;" :duration="300" >
         <swiper-item class="swiper-item" >
-            <view class="uni-center" style=" font-size:0;padding: 40px 40px 20px;">
-                <image class="image" mode="widthFix"  src="../../../static/DataEase-01.png" />
-            </view>
-            <view class="person-lic">
-                  
-                  <span v-if="license.edition === 'Enterprise'">{{$t('me.enterprise')}}</span>
-                  <span v-else>{{$t('me.standard')}}</span>
-            </view>
-            <view class="person-lic">
-                <span>{{build}}</span>
-            </view>
+<!--            <view class="uni-center" style=" font-size:0;padding: 40px 40px 20px;">-->
+<!--                <image class="image" mode="widthFix"  src="../../../static/DataEase-01.png" />-->
+<!--            </view>-->
+<!--            <view class="person-lic">-->
+
+<!--                  <span v-if="license.edition === 'Enterprise'">{{$t('me.enterprise')}}</span>-->
+<!--                  <span v-else>{{$t('me.standard')}}</span>-->
+<!--            </view>-->
+<!--            <view class="person-lic">-->
+<!--                <span>{{build}}</span>-->
+<!--            </view>-->
             <uni-list>
                 <uni-list-item clickable showArrow thumb-size="base" :title="$t('me.userManual')" @click="toUserManual" />
-                            
+
                 <uni-list-item clickable showArrow thumb-size="base" :title="$t('me.community')" @click="toGithub"/>
             </uni-list>
         </swiper-item>
@@ -40,7 +40,7 @@ export default {
     },
     methods: {
         toGithub() {
-            
+
             window.location.href = 'https://github.com/dataease/dataease'
         },
         toUserManual() {
@@ -55,7 +55,7 @@ export default {
             })
         },
         getLicenseInfo() {
-    
+
             this.validateHandler({}, res => {
                 this.license = this.getLicense(res.data)
             })
@@ -80,13 +80,13 @@ export default {
 <style  scoped>
 
 .dataease-main {
-    
+
     position: fixed;
     left: var(--window-left);
     right: var(--window-right);
     padding: 5px;
     height: calc(100vh - 90px);
-    
+
 }
 .swiper-box {
     flex: 1;
@@ -105,7 +105,7 @@ export default {
     text-align: center;
     overflow: hidden;
     white-space: nowrap;
-    
+
     text-overflow: ellipsis;
 }
 .person-lic {

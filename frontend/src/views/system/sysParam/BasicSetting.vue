@@ -173,40 +173,40 @@
         component-name="ScanLimitSetting"
       />
 
-      <el-form-item
-        :label="
-          $t('commons.yes') + $t('commons.no') + $t('display.openMarketPage')
-        "
-      >
-        <el-radio-group v-model="formInline.openMarketPage">
-          <el-radio
-            label="true"
-            size="mini"
-          >{{ $t("commons.yes") }}</el-radio>
-          <el-radio
-            label="false"
-            size="mini"
-          >{{ $t("commons.no") }}</el-radio>
-        </el-radio-group>
-      </el-form-item>
+<!--      <el-form-item-->
+<!--        :label="-->
+<!--          $t('commons.yes') + $t('commons.no') + $t('display.openMarketPage')-->
+<!--        "-->
+<!--      >-->
+<!--        <el-radio-group v-model="formInline.openMarketPage">-->
+<!--          <el-radio-->
+<!--            label="true"-->
+<!--            size="mini"-->
+<!--          >{{ $t("commons.yes") }}</el-radio>-->
+<!--          <el-radio-->
+<!--            label="false"-->
+<!--            size="mini"-->
+<!--          >{{ $t("commons.no") }}</el-radio>-->
+<!--        </el-radio-group>-->
+<!--      </el-form-item>-->
 
-      <el-form-item
-        :label="
-          $t('commons.yes') + $t('commons.no') + $t('display.openHomePage')
-        "
-        prop="openHomePage"
-      >
-        <el-radio-group v-model="formInline.openHomePage">
-          <el-radio
-            label="true"
-            size="mini"
-          >{{ $t("commons.yes") }}</el-radio>
-          <el-radio
-            label="false"
-            size="mini"
-          >{{ $t("commons.no") }}</el-radio>
-        </el-radio-group>
-      </el-form-item>
+<!--      <el-form-item-->
+<!--        :label="-->
+<!--          $t('commons.yes') + $t('commons.no') + $t('display.openHomePage')-->
+<!--        "-->
+<!--        prop="openHomePage"-->
+<!--      >-->
+<!--        <el-radio-group v-model="formInline.openHomePage">-->
+<!--          <el-radio-->
+<!--            label="true"-->
+<!--            size="mini"-->
+<!--          >{{ $t("commons.yes") }}</el-radio>-->
+<!--          <el-radio-->
+<!--            label="false"-->
+<!--            size="mini"-->
+<!--          >{{ $t("commons.no") }}</el-radio>-->
+<!--        </el-radio-group>-->
+<!--      </el-form-item>-->
     </el-form>
   </div>
 </template>

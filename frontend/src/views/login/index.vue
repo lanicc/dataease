@@ -444,7 +444,6 @@ export default {
           this.footContent = content
         }
       }
-      console.log(this.loginImageUrl)
     },
     initCache() {
       this.clearLocalStorage.forEach(item => {

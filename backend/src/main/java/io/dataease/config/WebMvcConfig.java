@@ -16,5 +16,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
 
         registry.addResourceHandler("/geo/**").addResourceLocations("file:" + geoPath);
+
+//        String workDir = Paths.get(ensureSuffix(WORK_DIR, FILE_SEPARATOR)).toAbsolutePath().toString();
+//        String uploadUrlPattern = ensureBoth(URL_SEPARATOR + UPLOAD_URL_PREFIX, URL_SEPARATOR) + "**";
+//        registry.addResourceHandler(uploadUrlPattern)
+//                .addResourceLocations("file:" + "/Users/lan/IdeaProjects/github/dataease/data/static-resource/");
     }
 }

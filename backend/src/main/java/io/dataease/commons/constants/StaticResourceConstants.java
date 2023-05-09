@@ -15,7 +15,7 @@ public class StaticResourceConstants {
 
     public static final String FILE_SEPARATOR = File.separator;
 
-    public static final String USER_HOME = "data";
+    public static final String USER_HOME = System.getProperty("USER_HOME","data");
 
     public static String WORK_DIR = ensureSuffix(USER_HOME, FILE_SEPARATOR) + "static-resource" + FILE_SEPARATOR;
 

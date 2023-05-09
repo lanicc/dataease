@@ -1,6 +1,5 @@
 <template>
-  <view v-if="axiosFinished" :class="mobileBG ? 'content-de' : 'content'"
-    :style="mobileBG ? {background:'url(' + mobileBG + ') no-repeat', 'backgroundSize':'cover'} : ''">
+  <view v-if="axiosFinished" :class="mobileBG ? 'content-de' : 'content'">
 
     <view class="input-group">
       <view class="input-row">
@@ -69,7 +68,7 @@
         title: this.$t('commons.loading')
       });
       this.loadUiInfo()
-      this.loadPublicKey()     
+      this.loadPublicKey()
       if (!this.autoLogin() && getToken() && getUserInfo()) {
         this.toMain()
       }
@@ -164,7 +163,7 @@
           getInfo().then(res => {
             setUserInfo(res.data)
             const redirect = window.location.href.split('?')[0]
-           
+
             window.location.href = redirect
           })
           return true
@@ -237,7 +236,7 @@
     flex: 1;
     flex-direction: column;
     background-color: #000000;
-    background-image: url(../../static/logo-bg.jpg);
+    background-image: url(../../static/logo-bg.png);
     padding: 10px;
     justify-content: center;
     background-repeat: no-repeat;
