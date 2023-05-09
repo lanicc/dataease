@@ -59,3 +59,4 @@ package-lock.json
 /ehcache/
 /data/static-resource/
 /kettle/admin/
+/backend/ehcache/
