@@ -1,5 +1,5 @@
 {
-    "app.name": "DataEase",
+    "app.name": "EffectBI",
 
     "navigate.menuHome": "首页",
     "navigate.menuDir": "目录",
@@ -11,7 +11,7 @@
     "navigate.about": "关于",
     "navigate.login": "登录",
     "searchPlaceholder": "请输入仪表板名称",
-    
+
     "commons": {
         "cancel": "取消",
         "sure": "确定",
@@ -50,7 +50,7 @@
     "me": {
         "moreInfo": "更多信息",
         "logout": "注销",
-       
+
         "systemInfo": "系统信息",
         "userManual": "用户手册",
         "community": "社区",
@@ -63,5 +63,5 @@
     "detail": {
         "starSuccess": "收藏成功"
     }
-    
+
   }

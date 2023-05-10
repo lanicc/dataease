@@ -1,5 +1,5 @@
 {
-    "app.name": "DataEase",
+    "app.name": "EffectBI",
     "navigate.menuHome": "首頁",
     "navigate.menuDir": "目錄",
     "navigate.menuMe": "我的",
@@ -10,8 +10,8 @@
     "navigate.about": "關於",
     "navigate.login": "登錄",
     "searchPlaceholder": "請輸入儀表板名稱",
-    
-    
+
+
     "commons": {
         "cancel": "取消",
         "sure": "確定",
@@ -21,7 +21,7 @@
         "sysLanguage": "跟隨系統",
         "tips": "提示",
         "loading": "加載中"
-        
+
     },
     "login": {
         "title": "用戶登錄",
@@ -51,7 +51,7 @@
     "me": {
         "moreInfo": "更多信息",
         "logout": "註銷",
-        
+
         "systemInfo": "系統信息",
         "userManual": "用戶手冊",
         "community": "社區",

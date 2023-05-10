@@ -1,7 +1,7 @@
 {
-    "app.name": "DataEase",
+    "app.name": "EffectBI",
     "navigate.menuHome": "Home",
-    "navigate.menuDir": "Folder",    
+    "navigate.menuDir": "Folder",
     "navigate.menuMe": "Me",
 
     "navigate.search": "Search",
@@ -10,7 +10,7 @@
     "navigate.about": "About",
     "navigate.login": "Login",
     "searchPlaceholder": "Please Input Panel Name",
-    
+
     "commons": {
         "cancel": "Cancel",
         "sure": "Sure",
@@ -20,7 +20,7 @@
         "sysLanguage": "Follow System",
         "tips": "Tips",
         "loading": "loading"
-        
+
     },
     "login": {
         "title": "User Login",
@@ -49,7 +49,7 @@
     "me": {
         "moreInfo": "More",
         "logout": "Logout",
-        
+
         "systemInfo": "System Info",
         "userManual": "User Manual",
         "community": "Community",
