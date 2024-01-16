@@ -1,8 +1,20 @@
-import { TableSheet, S2Event, PivotSheet, DataCell, EXTRA_FIELD, TOTAL_VALUE, BaseEvent } from '@antv/s2'
+import { TableSheet, BaseEvent, S2Event, PivotSheet, DataCell, EXTRA_FIELD, TOTAL_VALUE } from '@antv/s2'
 import { getCustomTheme, getSize } from '@/views/chart/chart/common/common_table'
 import { DEFAULT_COLOR_CASE, DEFAULT_TOTAL } from '@/views/chart/chart/chart'
 import { formatterItem, valueFormatter } from '@/views/chart/chart/formatter'
 import { handleTableEmptyStrategy, hexColorToRGBA } from '@/views/chart/chart/util'
+
+class RowHoverInteraction extends BaseEvent {
+  bindEvents() {
+    this.spreadsheet.on(S2Event.ROW_CELL_HOVER, (event) => {
+      this.spreadsheet.tooltip.show({
+        position: { x: 0, y: 0 },
+        content: '...'
+      })
+    })
+  }
+}
+
 export function baseTableInfo(s2, container, chart, action, tableData, pageInfo) {
   const containerDom = document.getElementById(container)
 
@@ -91,16 +103,17 @@ export function baseTableInfo(s2, container, chart, action, tableData, pageInfo)
     height: containerDom.offsetHeight,
     showSeriesNumber: customAttr.size.showIndex,
     style: getSize(chart),
-    conditions: getConditions(chart)
+    conditions: getConditions(chart),
+    frozenColCount: customAttr.size.tableColumnFreezeHead ?? 0,
+    frozenRowCount: customAttr.size.tableRowFreezeHead ?? 0
   }
   // 开启序号之后，第一列就是序号列，修改 label 即可
   if (s2Options.showSeriesNumber) {
     s2Options.colCell = (node) => {
       if (node.colIndex === 0) {
-        if (!customAttr.size.indexLabel) {
+        node.label = customAttr.size.indexLabel
+        if (!customAttr.size.indexLabel || customAttr.size.showTableHeader === false) {
           node.label = ' '
-        } else {
-          node.label = customAttr.size.indexLabel
         }
       }
     }
@@ -109,6 +122,18 @@ export function baseTableInfo(s2, container, chart, action, tableData, pageInfo)
         viewMeta.fieldValue = (pageInfo.pageSize * (pageInfo.page - 1)) + viewMeta.rowIndex + 1
       }
       return new DataCell(viewMeta, viewMeta?.spreadsheet)
+    }
+  }
+  // 隐藏表头，保留顶部的分割线, 禁用表头横向 resize
+  if (customAttr.size.showTableHeader === false) {
+    s2Options.style.colCfg.height = 1
+    s2Options.interaction = {
+      resize: {
+        colCellVertical: false
+      }
+    }
+    s2Options.colCell = (node) => {
+      node.label = ' '
     }
   }
 
@@ -125,7 +150,9 @@ export function baseTableInfo(s2, container, chart, action, tableData, pageInfo)
   if (size.tableColTooltip?.show) {
     s2.on(S2Event.COL_CELL_HOVER, event => showTooltip(s2, event))
   }
-
+  if (size.tableCellTooltip?.show) {
+    s2.on(S2Event.DATA_CELL_HOVER, event => showTooltipValue(s2, event))
+  }
   // theme
   const customTheme = getCustomTheme(chart)
   s2.setThemeCfg({ theme: customTheme })
@@ -270,18 +297,34 @@ export function baseTableNormal(s2, container, chart, action, tableData) {
     height: containerDom.offsetHeight,
     showSeriesNumber: customAttr.size.showIndex,
     style: getSize(chart),
-    conditions: getConditions(chart)
+    conditions: getConditions(chart),
+    frozenColCount: customAttr.size.tableColumnFreezeHead ?? 0,
+    frozenRowCount: customAttr.size.tableRowFreezeHead ?? 0
   }
   // 开启序号之后，第一列就是序号列，修改 label 即可
   if (s2Options.showSeriesNumber) {
     s2Options.colCell = (node) => {
       if (node.colIndex === 0) {
-        if (!customAttr.size.indexLabel) {
+        node.label = customAttr.size.indexLabel
+        if (!customAttr.size.indexLabel || customAttr.size.showTableHeader === false) {
           node.label = ' '
-        } else {
-          node.label = customAttr.size.indexLabel
         }
       }
+    }
+    s2Options.dataCell = (viewMeta) => {
+      return new DataCell(viewMeta, viewMeta?.spreadsheet)
+    }
+  }
+  // 隐藏表头，保留顶部的分割线, 禁用表头横向 resize
+  if (customAttr.size.showTableHeader === false) {
+    s2Options.style.colCfg.height = 1
+    s2Options.interaction = {
+      resize: {
+        colCellVertical: false
+      }
+    }
+    s2Options.colCell = (node) => {
+      node.label = ' '
     }
   }
 
@@ -297,6 +340,9 @@ export function baseTableNormal(s2, container, chart, action, tableData) {
   const size = customAttr.size
   if (size.tableColTooltip?.show) {
     s2.on(S2Event.COL_CELL_HOVER, event => showTooltip(s2, event))
+  }
+  if (size.tableCellTooltip?.show) {
+    s2.on(S2Event.DATA_CELL_HOVER, event => showTooltipValue(s2, event))
   }
   // theme
   const customTheme = getCustomTheme(chart)
@@ -495,6 +541,9 @@ export function baseTablePivot(s2, container, chart, action, headerAction, table
   if (size?.tableColTooltip?.show) {
     s2.on(S2Event.COL_CELL_HOVER, event => showTooltip(s2, event, fieldMap))
   }
+  if (size.tableCellTooltip?.show) {
+    s2.on(S2Event.DATA_CELL_HOVER, event => showTooltipValue(s2, event))
+  }
   // theme
   const customTheme = getCustomTheme(chart)
   s2.setThemeCfg({ theme: customTheme })
@@ -547,26 +596,35 @@ function getConditions(chart) {
       if (customAttr.color) {
         const c = JSON.parse(JSON.stringify(customAttr.color))
         valueColor = c.tableFontColor
-        valueBgColor = hexColorToRGBA(c.tableItemBgColor, c.alpha)
+        const enableTableCrossBG = c.enableTableCrossBG
+        if (!enableTableCrossBG) {
+          valueBgColor = hexColorToRGBA(c.tableItemBgColor, c.alpha)
+        } else {
+          valueBgColor = null
+        }
       }
     }
 
+    const filedValueMap = getFieldValueMap(chart)
     for (let i = 0; i < conditions.length; i++) {
       const field = conditions[i]
       res.text.push({
         field: field.field.dataeaseName,
-        mapping(value) {
+        mapping(value, rowData) {
           return {
-            fill: mappingColor(value, valueColor, field, 'color')
+            fill: mappingColor(value, valueColor, field, 'color', filedValueMap, rowData)
           }
         }
       })
       res.background.push({
         field: field.field.dataeaseName,
-        mapping(value) {
-          return {
-            fill: mappingColor(value, valueBgColor, field, 'backgroundColor')
+        mapping(value, rowData) {
+          const fill = mappingColor(value, valueBgColor, field, 'backgroundColor', filedValueMap, rowData)
+          if (fill) {
+            return { fill }
           }
+          // 返回 null 会使用主题中的背景色
+          return null
         }
       })
     }
@@ -574,13 +632,37 @@ function getConditions(chart) {
   return res
 }
 
-function mappingColor(value, defaultColor, field, type) {
+function getValue(field, filedValueMap, rowData) {
+  if (field.summary === 'value') {
+    return rowData[field.curField.dataeaseName]
+  } else {
+    return filedValueMap[field.summary + '-' + field.fieldId]
+  }
+}
+
+function mappingColor(value, defaultColor, field, type, filedValueMap, rowData) {
   let color
   for (let i = 0; i < field.conditions.length; i++) {
     let flag = false
     const t = field.conditions[i]
     if (field.field.deType === 2 || field.field.deType === 3 || field.field.deType === 4) {
-      const tv = parseFloat(t.value)
+      let tv, max, min
+      if (t.field === '1') {
+        if (t.term === 'between') {
+          max = parseFloat(getValue(t.maxField, filedValueMap, rowData))
+          min = parseFloat(getValue(t.minField, filedValueMap, rowData))
+        } else {
+          tv = parseFloat(getValue(t.targetField, filedValueMap, rowData))
+        }
+      } else {
+        if (t.term === 'between') {
+          min = parseFloat(t.min)
+          max = parseFloat(t.max)
+        } else {
+          tv = parseFloat(t.value)
+        }
+      }
+
       if (t.term === 'eq') {
         if (value === tv) {
           color = t[type]
@@ -612,8 +694,6 @@ function mappingColor(value, defaultColor, field, type) {
           flag = true
         }
       } else if (t.term === 'between') {
-        const min = parseFloat(t.min)
-        const max = parseFloat(t.max)
         if (min <= value && value <= max) {
           color = t[type]
           flag = true
@@ -625,7 +705,12 @@ function mappingColor(value, defaultColor, field, type) {
         color = defaultColor
       }
     } else if (field.field.deType === 0 || field.field.deType === 5) {
-      const tv = t.value
+      let tv
+      if (t.field === '1') {
+        tv = getValue(t.targetField, filedValueMap, rowData)
+      } else {
+        tv = t.value
+      }
       if (t.term === 'eq') {
         if (value === tv) {
           color = t[type]
@@ -664,7 +749,16 @@ function mappingColor(value, defaultColor, field, type) {
       }
     } else {
       // time
-      const tv = new Date(t.value.replace(/-/g, '/') + ' GMT+8').getTime()
+      let tv
+      if (t.field === '1') {
+        const fieldValue = getValue(t.targetField, filedValueMap, rowData)
+        if (fieldValue) {
+          tv = new Date(fieldValue.replace(/-/g, '/') + ' GMT+8').getTime()
+        }
+      } else {
+        tv = new Date(t.value.replace(/-/g, '/') + ' GMT+8').getTime()
+      }
+
       const v = new Date(value.replace(/-/g, '/') + ' GMT+8').getTime()
       if (t.term === 'eq') {
         if (v === tv) {
@@ -707,6 +801,18 @@ function mappingColor(value, defaultColor, field, type) {
   return color
 }
 
+function showTooltipValue(s2Instance, event) {
+  const cell = s2Instance.getCell(event.target)
+  const content = cell.actualText
+  s2Instance.showTooltip({
+    position: {
+      x: event.clientX,
+      y: event.clientY
+    },
+    content
+  })
+}
+
 function showTooltip(s2Instance, event, fieldMap) {
   const cell = s2Instance.getCell(event.target)
   const meta = cell.getMeta()
@@ -721,4 +827,14 @@ function showTooltip(s2Instance, event, fieldMap) {
     },
     content
   })
+}
+
+function getFieldValueMap(view) {
+  const fieldValueMap = {}
+  if (view.data && view.data.dynamicAssistData && view.data.dynamicAssistData.length > 0) {
+    view.data.dynamicAssistData.forEach(ele => {
+      fieldValueMap[ele.summary + '-' + ele.fieldId] = ele.value
+    })
+  }
+  return fieldValueMap
 }

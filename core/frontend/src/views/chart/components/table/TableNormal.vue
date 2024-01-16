@@ -2,8 +2,15 @@
   <div
     ref="tableContainer"
     :style="bg_class"
-    style="padding: 8px;width: 100%;height: 100%;overflow: hidden;"
+    style="padding: 8px;width: 100%;height: 100%;overflow: hidden;position: relative;"
   >
+    <view-track-bar
+      ref="viewTrack"
+      :track-menu="trackMenu"
+      :style="trackBarStyle"
+      class="track-bar"
+      @trackClick="trackClick"
+    />
     <el-row
       style="height: 100%;"
       :style="cssVars"
@@ -16,31 +23,37 @@
       <ux-grid
         ref="plxTable"
         size="mini"
+        class="table-class"
         :style="tableStyle"
         :height="height"
         :checkbox-config="{highlight: true}"
         :width-resize="true"
         :header-row-style="table_header_class"
         :row-style="getRowStyle"
-        class="table-class"
         :class="chart.id"
         :merge-cells="mergeCells"
         :show-summary="showSummary"
         :summary-method="summaryMethod"
         :index-config="{seqMethod}"
+        :show-header="showHeader"
+        @cell-click="cellClick"
       >
         <ux-table-column
           type="index"
           :title="indexLabel"
+          :width="columnWidth"
+          :resizable="true"
+          :fixed="getFixed(-1)"
         />
         <ux-table-column
-          v-for="field in fields"
+          v-for="(field, index) in fields"
           :key="field.name"
           :field="field.child ? '' : field.dataeaseName"
           :resizable="true"
           :sortable="(!mergeCells || !mergeCells.length) && (!field.child || !field.child.length)"
           :title="field.name"
           :width="columnWidth"
+          :fixed="getFixed(index)"
         >
           <ux-table-column
             v-for="item in field.child"
@@ -95,13 +108,13 @@
 
 <script>
 import { hexColorToRGBA } from '../../chart/util'
-import eventBus from '@/components/canvas/utils/eventBus'
 import { DEFAULT_COLOR_CASE, DEFAULT_SCROLL, DEFAULT_SIZE, NOT_SUPPORT_PAGE_DATASET } from '@/views/chart/chart/chart'
 import { mapState } from 'vuex'
 import DePagination from '@/components/deCustomCm/pagination.js'
+import ViewTrackBar from '@/components/canvas/components/editor/ViewTrackBar.vue'
 export default {
   name: 'TableNormal',
-  components: { DePagination },
+  components: { ViewTrackBar, DePagination },
   props: {
     chart: {
       type: Object,
@@ -114,15 +127,22 @@ export default {
         return {}
       }
     },
-    showSummary: {
-      type: Boolean,
-      required: false,
-      default: true
-    },
     enableScroll: {
       type: Boolean,
       required: false,
       default: true
+    },
+    trackMenu: {
+      type: Array,
+      required: false,
+      default: function() {
+        return ['drill']
+      }
+    },
+    searchCount: {
+      type: Number,
+      required: false,
+      default: 0
     }
   },
   data() {
@@ -174,6 +194,7 @@ export default {
       scrollTop: 0,
       showIndex: false,
       indexLabel: '序号',
+      showHeader: true,
       scrollBarColor: DEFAULT_COLOR_CASE.tableScrollBarColor,
       scrollBarHoverColor: DEFAULT_COLOR_CASE.tableScrollBarHoverColor,
       totalStyle: {
@@ -186,7 +207,15 @@ export default {
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap'
-      }
+      },
+      trackBarStyle: {
+        position: 'absolute',
+        left: '0px',
+        top: '0px'
+      },
+      pointParam: null,
+      showSummary: true,
+      resizeTimer: null
     }
   },
   computed: {
@@ -211,7 +240,11 @@ export default {
     tableStyle() {
       return {
         width: '100%',
-        '--scroll-bar-color': this.scrollBarColor
+        '--scroll-bar-color': this.scrollBarColor,
+        '--footer-font-color': this.table_header_class.color,
+        '--footer-bg-color': this.table_header_class.background,
+        '--footer-font-size': this.table_header_class.fontSize,
+        '--footer-height': this.table_header_class.height
       }
     },
     ...mapState([
@@ -234,11 +267,8 @@ export default {
   },
   mounted() {
     this.init()
-    // 监听元素变动事件
-    eventBus.$on('resizing', this.chartResize)
   },
   beforeDestroy() {
-    eventBus.$off('resizing', this.chartResize)
     clearInterval(this.scrollTimer)
     window.removeEventListener('resize', this.calcHeightDelay)
   },
@@ -273,13 +303,17 @@ export default {
         }
         this.fields = fields
         const attr = JSON.parse(this.chart.customAttr)
+        if (this.currentPage.pageSize < attr.size.tablePageSize) {
+          this.currentPage.page = 1
+        }
         this.currentPage.pageSize = parseInt(attr.size.tablePageSize ? attr.size.tablePageSize : 20)
 
         // column width
         const containerWidth = this.$refs.tableContainer.offsetWidth
         const columnWidth = attr.size.tableColumnWidth ? attr.size.tableColumnWidth : this.columnWidth
-        if (columnWidth < (containerWidth / this.fields.length)) {
-          this.columnWidth = containerWidth / this.fields
+        const fieldsLength = attr.size.showIndex ? this.fields.length + 1 : this.fields.length
+        if (columnWidth < (containerWidth / fieldsLength)) {
+          this.columnWidth = containerWidth / fieldsLength
         } else {
           this.columnWidth = columnWidth
         }
@@ -305,7 +339,7 @@ export default {
         data = []
         this.resetPage()
       }
-      if (this.chart.data.detailFields?.length) {
+      if (this.chart.data?.detailFields?.length) {
         let result = []
         let groupRowIndex = 0
         data.forEach(item => {
@@ -337,8 +371,7 @@ export default {
         })
       }
 
-      this.$refs.plxTable.reloadData(data)
-      this.$nextTick(() => {
+      this.$refs.plxTable.reloadData(data).then(() => {
         this.initStyle()
       })
       window.addEventListener('resize', this.calcHeightDelay)
@@ -393,7 +426,8 @@ export default {
       })
     },
     calcHeightDelay() {
-      setTimeout(() => {
+      this.resizeTimer && clearTimeout(this.resizeTimer)
+      this.resizeTimer = setTimeout(() => {
         this.calcHeightRightNow()
       }, 100)
     },
@@ -413,20 +447,25 @@ export default {
           this.table_item_class.fontSize = customAttr.size.tableItemFontSize + 'px'
           this.table_header_class.height = customAttr.size.tableTitleHeight + 'px'
           this.table_item_class.height = customAttr.size.tableItemHeight + 'px'
-
           const visibleColumn = this.$refs.plxTable.getTableColumn().fullColumn
           for (let i = 0, column = visibleColumn[i]; i < visibleColumn.length; i++) {
-            // 有变更才刷新
             if (column.type === 'index' && column.visible !== customAttr.size.showIndex) {
               column.visible = customAttr.size.showIndex
-              this.$refs.plxTable.refreshColumn()
               break
             }
           }
+          this.$refs.plxTable.refreshColumn()
           if (!customAttr.size.indexLabel) {
             this.indexLabel = ' '
           } else {
             this.indexLabel = customAttr.size.indexLabel
+          }
+          if (customAttr.size.showTableHeader === false) {
+            this.showHeader = false
+            this.showSummary = false
+          } else {
+            this.showHeader = true
+            this.showSummary = this.chart.type === 'table-normal'
           }
 
           const autoBreakLine = customAttr.size.tableAutoBreakLine ? customAttr.size.tableAutoBreakLine : DEFAULT_SIZE.tableAutoBreakLine
@@ -441,16 +480,9 @@ export default {
           }
         }
         this.table_item_class_stripe = JSON.parse(JSON.stringify(this.table_item_class))
-        // 暂不支持斑马纹
-        // if (customAttr.color.tableStripe) {
-        //   // this.table_item_class_stripe.background = hexColorToRGBA(customAttr.color.tableItemBgColor, customAttr.color.alpha - 40)
-        //   if (this.chart.customStyle) {
-        //     const customStyle = JSON.parse(this.chart.customStyle)
-        //     if (customStyle.background) {
-        //       this.table_item_class_stripe.background = hexColorToRGBA(customStyle.background.color, customStyle.background.alpha)
-        //     }
-        //   }
-        // }
+        if (customAttr.color.enableTableCrossBG) {
+          this.table_item_class_stripe.background = hexColorToRGBA(customAttr.color.tableItemSubBgColor, customAttr.color.alpha)
+        }
       }
       if (this.chart.customStyle) {
         const customStyle = JSON.parse(this.chart.customStyle)
@@ -466,18 +498,6 @@ export default {
         }
         if (customStyle.background) {
           this.bg_class.background = hexColorToRGBA(customStyle.background.color, customStyle.background.alpha)
-        }
-      }
-      // 修改footer合计样式
-      const table = document.getElementsByClassName(this.chart.id)
-      for (let i = 0; i < table.length; i++) {
-        const s_table = table[i].getElementsByClassName('elx-table--footer')
-        let s = ''
-        for (const i in this.table_header_class) {
-          s += (i === 'fontSize' ? 'font-size' : i) + ':' + this.table_header_class[i] + ';'
-        }
-        for (let i = 0; i < s_table.length; i++) {
-          s_table[i].setAttribute('style', s)
         }
       }
     },
@@ -579,12 +599,6 @@ export default {
       const scrollContainer = document.getElementsByClassName(this.chart.id)[0].getElementsByClassName('elx-table--body-wrapper')[0]
 
       this.scrollTop = 0
-      setTimeout(() => {
-        scrollContainer.scrollTo({
-          top: this.scrollTop,
-          behavior: this.scrollTop === 0 ? 'instant' : 'smooth'
-        })
-      }, 0)
 
       if (senior && senior.scrollCfg && senior.scrollCfg.open && (this.chart.type === 'table-normal' || (this.chart.type === 'table-info' && !this.showPage))) {
         let rowHeight = customAttr.size.tableItemHeight
@@ -603,10 +617,15 @@ export default {
             top = rowHeight * senior.scrollCfg.row
           }
 
-          if (scrollContainer.clientHeight + scrollContainer.scrollTop < scrollContainer.scrollHeight) {
+          const { clientHeight, scrollTop, scrollHeight } = scrollContainer
+
+          if (clientHeight + scrollTop < scrollHeight) {
             this.scrollTop += top
           } else {
             this.scrollTop = 0
+          }
+          if (!clientHeight) {
+            return
           }
           scrollContainer.scrollTo({
             top: this.scrollTop,
@@ -614,6 +633,91 @@ export default {
           })
         }, senior.scrollCfg.interval)
       }
+    },
+    cellClick(row, col, cell, ev) {
+      const nameIdMap = this.chart.data.fields.reduce((pre, next) => {
+        pre[next['dataeaseName']] = next['id']
+        return pre
+      }, {})
+      const dimensionList = []
+      for (const key in row) {
+        if (nameIdMap[key]) {
+          dimensionList.push({ id: nameIdMap[key], value: row[key] })
+        }
+      }
+      const parent = cell.offsetParent
+      // 元素离顶部距离减去滚动距离加上表头高度加上点击位置高度
+      const y = cell.offsetTop - parent.scrollTop + parent.offsetTop + ev.offsetY
+      const position = {
+        x: cell.offsetLeft + ev.offsetX,
+        y
+      }
+      this.antVActionPost(dimensionList, nameIdMap[col.property] || 'null', position)
+    },
+    antVActionPost(dimensionList, name, param) {
+      this.pointParam = {
+        data: {
+          dimensionList: dimensionList,
+          quotaList: [],
+          name: name,
+          sourceType: this.chart.type
+        }
+      }
+
+      if (this.trackMenu.length < 2) { // 只有一个事件直接调用
+        this.trackClick(this.trackMenu[0])
+      } else { // 视图关联多个事件
+        this.trackBarStyle.left = param.x + 'px'
+        this.trackBarStyle.top = (param.y + 10) + 'px'
+        this.$refs.viewTrack.trackButtonClick()
+      }
+    },
+    trackClick(trackAction) {
+      const param = this.pointParam
+      if (!param?.data?.dimensionList) {
+        // 地图提示没有关联字段 其他没有维度信息的 直接返回
+        if (this.chart.type === 'map') {
+          this.$warning(this.$t('panel.no_drill_field'))
+        }
+        return
+      }
+      const linkageParam = {
+        option: 'linkage',
+        name: this.pointParam.data.name,
+        viewId: this.chart.id,
+        dimensionList: this.pointParam.data.dimensionList,
+        quotaList: this.pointParam.data.quotaList
+      }
+      const jumpParam = {
+        option: 'jump',
+        name: this.pointParam.data.name,
+        viewId: this.chart.id,
+        dimensionList: this.pointParam.data.dimensionList,
+        quotaList: this.pointParam.data.quotaList,
+        sourceType: this.pointParam.data.sourceType
+      }
+      switch (trackAction) {
+        case 'drill':
+          this.currentPage.page = 1
+          this.$emit('onChartClick', this.pointParam)
+          break
+        case 'linkage':
+          this.$store.commit('addViewTrackFilter', linkageParam)
+          break
+        case 'jump':
+          this.$emit('onJumpClick', jumpParam)
+          break
+        default:
+          break
+      }
+    },
+    getFixed(index) {
+      const size = JSON.parse(this.chart.customAttr).size
+      const { showIndex, tableColumnFreezeHead } = size
+      if (showIndex) {
+        return index < tableColumnFreezeHead - 1 ? 'left' : ''
+      }
+      return index < tableColumnFreezeHead ? 'left' : ''
     }
   }
 }
@@ -702,6 +806,12 @@ export default {
     overflow: var(--overflow, 'hidden');
     text-overflow: var(--text-overflow, 'ellipsis');
     white-space: var(--white-space, 'nowrap');
+  }
+  ::v-deep .elx-table--footer {
+    color: var(--footer-font-color);
+    background: var(--footer-bg-color);
+    font-size: var(--footer-font-size);
+    height: var(--footer-height);
   }
 }
 

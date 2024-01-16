@@ -46,13 +46,13 @@
     <div style="height: calc(100% - 56px)">
       <DsFormContent
         ref="DsFormContent"
-        @editeTodisable="backToList"
         :outer-params="outerParams"
         :reference-position="referencePosition"
         :form-type.sync="formType"
         :type-map.sync="typeMap"
         :can-edit.sync="canEdit"
         :form-loading.sync="formLoading"
+        @editeTodisable="backToList"
         @refreshType="refreshType"
         @closeDraw="closeDraw"
         @setParams="setParams"
@@ -96,7 +96,7 @@ export default {
     },
     tips() {
       const { id, showModel } = this.params
-      if(showModel === 'copy'){
+      if (showModel === 'copy') {
         return this.$t('datasource.copy')
       }
       return id && showModel === 'show' && !this.canEdit
@@ -180,7 +180,7 @@ export default {
     box-shadow: 2px 2px 4px rgba(31, 35, 41, 0.08);
 
     .name {
-      font-family: 'PingFang SC';
+      font-family: 'AlibabaPuHuiTi';
       font-style: normal;
       font-weight: 500;
       font-size: 16px;
@@ -207,7 +207,7 @@ export default {
     box-shadow: 0px 2px 4px rgba(31, 35, 41, 0.08);
 
     .name {
-      font-family: 'PingFang SC';
+      font-family: 'AlibabaPuHuiTi';
       font-style: normal;
       font-weight: 500;
       font-size: 16px;

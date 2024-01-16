@@ -9,9 +9,6 @@ const vKey = 86 // 粘贴
 const cKey = 67 // 复制
 const xKey = 88 // 剪切
 
-const yKey = 89 // 重做
-const zKey = 90 // 撤销
-
 const gKey = 71 // 组合
 const bKey = 66 // 拆分
 
@@ -33,7 +30,7 @@ const ignoreComponent = ['de-button', 'de-reset-button']
 const basemap = {
   [vKey]: paste,
   [gKey]: redo,
-  [bKey]: undo,
+  [bKey]: undo
 }
 
 // 组件未锁定状态下可以执行的操作
@@ -50,10 +47,31 @@ const unlockMap = {
 
 let isCtrlOrCommandDown = false
 
+// 检查当前页面是否有弹框
+const checkDialog = () => {
+  let haveDialog = false
+  document.querySelectorAll('.el-dialog__wrapper').forEach(element => {
+    if (window.getComputedStyle(element).getPropertyValue('display') !== 'none') {
+      haveDialog = true
+    }
+  })
+  document.querySelectorAll('.el-popover').forEach(element => {
+    if (window.getComputedStyle(element).getPropertyValue('display') !== 'none') {
+      haveDialog = true
+    }
+  })
+  // 富文本单框
+  if (document.querySelector('.tox-dialog-wrap')) {
+    haveDialog = true
+  }
+
+  return haveDialog
+}
+
 // Monitor key operations globally and execute corresponding commands
 export function listenGlobalKeyDown() {
   window.onkeydown = (e) => {
-    if (!store.state.isInEditor) return
+    if (!store.state.isInEditor || checkDialog()) return
     const { keyCode } = e
     if (keyCode === ctrlKey || keyCode === commandKey) {
       isCtrlOrCommandDown = true
@@ -117,21 +135,6 @@ function redo() {
 
 function undo() {
   store.commit('undo')
-}
-
-function compose() {
-  if (store.state.areaData.components.length) {
-    store.commit('compose')
-    store.commit('recordSnapshot')
-  }
-}
-
-function decompose() {
-  const curComponent = store.state.curComponent
-  if (curComponent && !curComponent.isLock && curComponent.component === 'Group') {
-    store.commit('decompose')
-    store.commit('recordSnapshot')
-  }
 }
 
 function copyAndPast() {

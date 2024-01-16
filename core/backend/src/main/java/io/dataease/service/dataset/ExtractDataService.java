@@ -9,7 +9,6 @@ import io.dataease.controller.request.datasource.ApiDefinition;
 import io.dataease.dto.dataset.DataTableInfoDTO;
 import io.dataease.dto.dataset.ExcelSheetData;
 import io.dataease.dto.datasource.*;
-import io.dataease.exception.DataEaseException;
 import io.dataease.ext.ExtChartViewMapper;
 import io.dataease.listener.util.CacheUtils;
 import io.dataease.plugins.common.base.domain.*;
@@ -17,6 +16,7 @@ import io.dataease.plugins.common.constants.DatasetType;
 import io.dataease.plugins.common.constants.DatasourceTypes;
 import io.dataease.plugins.common.constants.DeTypeConstants;
 import io.dataease.plugins.common.dto.datasource.TableField;
+import io.dataease.plugins.common.exception.DataEaseException;
 import io.dataease.plugins.common.request.datasource.DatasourceRequest;
 import io.dataease.plugins.datasource.entity.JdbcConfiguration;
 import io.dataease.plugins.datasource.provider.Provider;
@@ -223,7 +223,7 @@ public class ExtractDataService {
                         for (DatasetTableField datasetTableField : datasetTableFields) {
                             boolean add = true;
                             for (DatasetTableField oldField : oldFields) {
-                                if (oldField.getDataeaseName().equalsIgnoreCase(datasetTableField.getDataeaseName())) {
+                                if (oldField.getDataeaseName().equalsIgnoreCase(datasetTableField.getDataeaseName()) && oldField.getType().equalsIgnoreCase(datasetTableField.getType())) {
                                     add = false;
                                 }
                             }
@@ -362,13 +362,14 @@ public class ExtractDataService {
 
             case add_scope: // 增量更新
                 try {
+                    if (datasetTable.getLastUpdateTime() == null || datasetTable.getLastUpdateTime() == 0) {
+                        throw new Exception("未进行全量同步");
+                    }
                     if (datasource.getType().equalsIgnoreCase(DatasourceTypes.api.name())) {
                         extractData(datasetTable, datasource, datasetTableFields, "incremental_add", null);
                     } else {
                         DatasetTableIncrementalConfig datasetTableIncrementalConfig = dataSetTableService.incrementalConfig(datasetTableId);
-                        if (datasetTable.getLastUpdateTime() == null || datasetTable.getLastUpdateTime() == 0) {
-                            throw new Exception("未进行全量同步");
-                        }
+
 
                         execTime = System.currentTimeMillis();
                         if (datasetTableIncrementalConfig != null && StringUtils.isNotEmpty(datasetTableIncrementalConfig.getIncrementalAdd()) && StringUtils.isNotEmpty(datasetTableIncrementalConfig.getIncrementalAdd().replace(" ", ""))) {// 增量添加
@@ -645,8 +646,10 @@ public class ExtractDataService {
         JdbcProvider jdbcProvider = CommonBeanFactory.getBean(JdbcProvider.class);
         DatasourceRequest datasourceRequest = new DatasourceRequest();
         datasourceRequest.setDatasource(engine);
+        datasourceRequest.setQuery("SELECT VERSION()");
+        String version = jdbcProvider.getData(datasourceRequest).get(0)[0];
         DDLProvider ddlProvider = ProviderFactory.getDDLProvider(engine.getType());
-        datasourceRequest.setQuery(ddlProvider.createTableSql(tableName, datasetTableFields, engine));
+        datasourceRequest.setQuery(ddlProvider.createTableSql(tableName, datasetTableFields, engine, version));
         jdbcProvider.exec(datasourceRequest);
     }
 
@@ -1273,7 +1276,7 @@ public class ExtractDataService {
         String excelCompletion = "";
 
         for (DatasetTableField datasetTableField : datasetTableFields) {
-            if (datasetTableField.getDeExtractType().equals(DeTypeConstants.DE_BINARY)) {
+            if (datasetTableField.getDeExtractType().equals(DeTypeConstants.DE_BINARY) || datasetTableField.getType().equalsIgnoreCase("blob")) {
                 handleBinaryTypeCode.append("\n").append(handleBinaryType.replace("FIELD", datasetTableField.getDataeaseName()));
             }
         }

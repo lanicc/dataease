@@ -1,6 +1,7 @@
 package io.dataease.provider.query.es;
 
 import com.alibaba.fastjson.JSONArray;
+import io.dataease.i18n.Translator;
 import io.dataease.plugins.common.base.domain.ChartViewWithBLOBs;
 import io.dataease.plugins.common.base.domain.DatasetTableField;
 import io.dataease.plugins.common.base.domain.DatasetTableFieldExample;
@@ -14,13 +15,17 @@ import io.dataease.plugins.common.dto.chart.ChartFieldCustomFilterDTO;
 import io.dataease.plugins.common.dto.chart.ChartViewFieldDTO;
 import io.dataease.plugins.common.dto.datasource.DeSortField;
 import io.dataease.plugins.common.dto.sqlObj.SQLObj;
+import io.dataease.plugins.common.exception.DataEaseException;
 import io.dataease.plugins.common.request.chart.ChartExtFilterRequest;
+import io.dataease.plugins.common.request.chart.filter.FilterTreeItem;
+import io.dataease.plugins.common.request.chart.filter.FilterTreeObj;
 import io.dataease.plugins.common.request.permission.DataSetRowPermissionsTreeDTO;
 import io.dataease.plugins.common.request.permission.DatasetRowPermissionsTreeItem;
 import io.dataease.plugins.datasource.entity.Dateformat;
 import io.dataease.plugins.datasource.query.QueryProvider;
 import io.dataease.plugins.datasource.query.Utils;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -119,12 +124,12 @@ public class EsQueryProvider extends QueryProvider {
     }
 
     @Override
-    public String createQuerySQL(String table, List<DatasetTableField> fields, boolean isGroup, Datasource ds, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree) {
-        return createQuerySQL(table, fields, isGroup, ds, fieldCustomFilter, rowPermissionsTree, null);
+    public String createQuerySQL(String table, List<DatasetTableField> fields, boolean isGroup, Datasource ds, FilterTreeObj fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree) {
+        return createQuerySQL(table, fields, isGroup, ds, fieldCustomFilter, rowPermissionsTree, null, null, null);
     }
 
     @Override
-    public String createQuerySQL(String table, List<DatasetTableField> fields, boolean isGroup, Datasource ds, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<DeSortField> sortFields) {
+    public String createQuerySQL(String table, List<DatasetTableField> fields, boolean isGroup, Datasource ds, FilterTreeObj fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<DeSortField> sortFields, Long limit, String keyword) {
         SQLObj tableObj = SQLObj.builder()
                 .tableName((table.startsWith("(") && table.endsWith(")")) ? table : String.format(EsSqlLConstants.KEYWORD_TABLE, table))
                 .tableAlias(String.format(TABLE_ALIAS_PREFIX, 0))
@@ -172,6 +177,7 @@ public class EsQueryProvider extends QueryProvider {
                     }
                 }
                 xFields.add(SQLObj.builder()
+                        .fieldOriginName(originField)
                         .fieldName(fieldName)
                         .fieldAlias(fieldAlias)
                         .build());
@@ -184,12 +190,16 @@ public class EsQueryProvider extends QueryProvider {
         if (CollectionUtils.isNotEmpty(xFields)) st_sql.add("groups", xFields);
         if (ObjectUtils.isNotEmpty(tableObj)) st_sql.add("table", tableObj);
 
-        String customWheres = transCustomFilterList(tableObj, fieldCustomFilter);
+        String customWheres = transChartFilterTrees(tableObj, fieldCustomFilter);
         // row permissions tree
         String whereTrees = transFilterTrees(tableObj, rowPermissionsTree);
         List<String> wheres = new ArrayList<>();
         if (customWheres != null) wheres.add(customWheres);
         if (whereTrees != null) wheres.add(whereTrees);
+        if (StringUtils.isNotBlank(keyword)) {
+            String keyWhere = "(" + transKeywordFilterList(tableObj, xFields, keyword) + ")";
+            wheres.add(keyWhere);
+        }
         if (CollectionUtils.isNotEmpty(wheres)) st_sql.add("filters", wheres);
 
 
@@ -204,6 +214,12 @@ public class EsQueryProvider extends QueryProvider {
         }
         if (ObjectUtils.isNotEmpty(xOrders)) {
             st_sql.add("orders", xOrders);
+        }
+        if (ObjectUtils.isNotEmpty(limit)) {
+            ChartViewWithBLOBs view = new ChartViewWithBLOBs();
+            view.setResultMode("custom");
+            view.setResultCount(Integer.parseInt(limit.toString()));
+            return sqlLimit(st_sql.render(), view);
         }
 
         return st_sql.render();
@@ -253,37 +269,37 @@ public class EsQueryProvider extends QueryProvider {
     }
 
     @Override
-    public String createQuerySQLAsTmp(String sql, List<DatasetTableField> fields, boolean isGroup, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<DeSortField> sortFields) {
-        return createQuerySQL("(" + sqlFix(sql) + ")", fields, isGroup, null, fieldCustomFilter, rowPermissionsTree, sortFields);
+    public String createQuerySQLAsTmp(String sql, List<DatasetTableField> fields, boolean isGroup, FilterTreeObj fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<DeSortField> sortFields, Long limit, String keyword) {
+        return createQuerySQL("(" + sqlFix(sql) + ")", fields, isGroup, null, fieldCustomFilter, rowPermissionsTree, sortFields, limit, keyword);
     }
 
     @Override
-    public String createQuerySQLAsTmp(String sql, List<DatasetTableField> fields, boolean isGroup, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree) {
+    public String createQuerySQLAsTmp(String sql, List<DatasetTableField> fields, boolean isGroup, FilterTreeObj fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree) {
         return createQuerySQL("(" + sqlFix(sql) + ")", fields, isGroup, null, fieldCustomFilter, rowPermissionsTree);
     }
 
     @Override
-    public String createQueryTableWithPage(String table, List<DatasetTableField> fields, Integer page, Integer pageSize, Integer realSize, boolean isGroup, Datasource ds, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree) {
+    public String createQueryTableWithPage(String table, List<DatasetTableField> fields, Integer page, Integer pageSize, Integer realSize, boolean isGroup, Datasource ds, FilterTreeObj fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree) {
         return createQuerySQL(table, fields, isGroup, null, fieldCustomFilter, rowPermissionsTree);
     }
 
     @Override
-    public String createQueryTableWithLimit(String table, List<DatasetTableField> fields, Integer limit, boolean isGroup, Datasource ds, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree) {
+    public String createQueryTableWithLimit(String table, List<DatasetTableField> fields, Integer limit, boolean isGroup, Datasource ds, FilterTreeObj fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree) {
         return createQuerySQL(table, fields, isGroup, null, fieldCustomFilter, rowPermissionsTree);
     }
 
     @Override
-    public String createQuerySqlWithLimit(String sql, List<DatasetTableField> fields, Integer limit, boolean isGroup, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree) {
+    public String createQuerySqlWithLimit(String sql, List<DatasetTableField> fields, Integer limit, boolean isGroup, FilterTreeObj fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree) {
         return createQuerySQLAsTmp(sql, fields, isGroup, fieldCustomFilter, rowPermissionsTree);
     }
 
     @Override
-    public String createQuerySQLWithPage(String sql, List<DatasetTableField> fields, Integer page, Integer pageSize, Integer realSize, boolean isGroup, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree) {
+    public String createQuerySQLWithPage(String sql, List<DatasetTableField> fields, Integer page, Integer pageSize, Integer realSize, boolean isGroup, FilterTreeObj fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree) {
         return createQuerySQLAsTmp(sql, fields, isGroup, fieldCustomFilter, rowPermissionsTree);
     }
 
     @Override
-    public String getSQL(String table, List<ChartViewFieldDTO> xAxis, List<ChartViewFieldDTO> yAxis, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, Datasource ds, ChartViewWithBLOBs view) {
+    public String getSQL(String table, List<ChartViewFieldDTO> xAxis, List<ChartViewFieldDTO> yAxis, FilterTreeObj fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, Datasource ds, ChartViewWithBLOBs view) {
         SQLObj tableObj = SQLObj.builder()
                 .tableName((table.startsWith("(") && table.endsWith(")")) ? table : String.format(EsSqlLConstants.KEYWORD_TABLE, table))
                 .tableAlias(String.format(TABLE_ALIAS_PREFIX, 0))
@@ -333,8 +349,10 @@ public class EsQueryProvider extends QueryProvider {
                 } else if (ObjectUtils.isNotEmpty(y.getExtField()) && y.getExtField() == DeTypeConstants.DE_TIME) {
                     originField = String.format(EsSqlLConstants.KEYWORD_FIX, tableObj.getTableAlias(), y.getOriginName());
                 } else {
-                    if (y.getDeType() == 2 || y.getDeType() == 3) {
+                    if (y.getDeType() == 2) {
                         originField = String.format(EsSqlLConstants.CAST, String.format(EsSqlLConstants.KEYWORD_FIX, tableObj.getTableAlias(), y.getOriginName()), "bigint");
+                    } else if (y.getDeType() == 3) {
+                        originField = String.format(EsSqlLConstants.CAST, String.format(EsSqlLConstants.KEYWORD_FIX, tableObj.getTableAlias(), y.getOriginName()), "float");
                     } else {
                         originField = String.format(EsSqlLConstants.KEYWORD_FIX, tableObj.getTableAlias(), y.getOriginName());
                     }
@@ -355,7 +373,7 @@ public class EsQueryProvider extends QueryProvider {
             }
         }
         // 处理视图中字段过滤
-        String customWheres = transCustomFilterList(tableObj, fieldCustomFilter);
+        String customWheres = transChartFilterTrees(tableObj, fieldCustomFilter);
         // 处理仪表板字段过滤
         String extWheres = transExtFilterList(tableObj, extFilterRequestList);
         // row permissions tree
@@ -398,12 +416,12 @@ public class EsQueryProvider extends QueryProvider {
 
 
     @Override
-    public String getSQLAsTmp(String sql, List<ChartViewFieldDTO> xAxis, List<ChartViewFieldDTO> yAxis, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, ChartViewWithBLOBs view) {
+    public String getSQLAsTmp(String sql, List<ChartViewFieldDTO> xAxis, List<ChartViewFieldDTO> yAxis, FilterTreeObj fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, ChartViewWithBLOBs view) {
         return getSQL("(" + sqlFix(sql) + ")", xAxis, yAxis, fieldCustomFilter, rowPermissionsTree, extFilterRequestList, null, view);
     }
 
     @Override
-    public String getSQLTableInfo(String table, List<ChartViewFieldDTO> xAxis, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, Datasource ds, ChartViewWithBLOBs view) {
+    public String getSQLTableInfo(String table, List<ChartViewFieldDTO> xAxis, FilterTreeObj fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, Datasource ds, ChartViewWithBLOBs view) {
         SQLObj tableObj = SQLObj.builder()
                 .tableName((table.startsWith("(") && table.endsWith(")")) ? table : String.format(EsSqlLConstants.KEYWORD_TABLE, table))
                 .tableAlias(String.format(TABLE_ALIAS_PREFIX, 0))
@@ -440,7 +458,7 @@ public class EsQueryProvider extends QueryProvider {
             }
         }
         // 处理视图中字段过滤
-        String customWheres = transCustomFilterList(tableObj, fieldCustomFilter);
+        String customWheres = transChartFilterTrees(tableObj, fieldCustomFilter);
         // 处理仪表板字段过滤
         String extWheres = transExtFilterList(tableObj, extFilterRequestList);
         // row permissions tree
@@ -478,12 +496,12 @@ public class EsQueryProvider extends QueryProvider {
     }
 
     @Override
-    public String getSQLAsTmpTableInfo(String sql, List<ChartViewFieldDTO> xAxis, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, Datasource ds, ChartViewWithBLOBs view) {
+    public String getSQLAsTmpTableInfo(String sql, List<ChartViewFieldDTO> xAxis, FilterTreeObj fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, Datasource ds, ChartViewWithBLOBs view) {
         return getSQLTableInfo("(" + sqlFix(sql) + ")", xAxis, fieldCustomFilter, rowPermissionsTree, extFilterRequestList, ds, view);
     }
 
     @Override
-    public String getSQLStack(String table, List<ChartViewFieldDTO> xAxis, List<ChartViewFieldDTO> yAxis, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, List<ChartViewFieldDTO> extStack, Datasource ds, ChartViewWithBLOBs view) {
+    public String getSQLStack(String table, List<ChartViewFieldDTO> xAxis, List<ChartViewFieldDTO> yAxis, FilterTreeObj fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, List<ChartViewFieldDTO> extStack, Datasource ds, ChartViewWithBLOBs view) {
         SQLObj tableObj = SQLObj.builder()
                 .tableName((table.startsWith("(") && table.endsWith(")")) ? table : String.format(EsSqlLConstants.KEYWORD_TABLE, table))
                 .tableAlias(String.format(TABLE_ALIAS_PREFIX, 0))
@@ -558,7 +576,7 @@ public class EsQueryProvider extends QueryProvider {
             }
         }
         // 处理视图中字段过滤
-        String customWheres = transCustomFilterList(tableObj, fieldCustomFilter);
+        String customWheres = transChartFilterTrees(tableObj, fieldCustomFilter);
         // 处理仪表板字段过滤
         String extWheres = transExtFilterList(tableObj, extFilterRequestList);
         // row permissions tree
@@ -600,21 +618,39 @@ public class EsQueryProvider extends QueryProvider {
     }
 
     @Override
-    public String getSQLAsTmpStack(String table, List<ChartViewFieldDTO> xAxis, List<ChartViewFieldDTO> yAxis, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, List<ChartViewFieldDTO> extStack, ChartViewWithBLOBs view) {
+    public String getSQLAsTmpStack(String table, List<ChartViewFieldDTO> xAxis, List<ChartViewFieldDTO> yAxis, FilterTreeObj fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, List<ChartViewFieldDTO> extStack, ChartViewWithBLOBs view) {
         return getSQLStack("(" + sqlFix(table) + ")", xAxis, yAxis, fieldCustomFilter, rowPermissionsTree, extFilterRequestList, extStack, null, view);
     }
 
     @Override
-    public String getSQLScatter(String table, List<ChartViewFieldDTO> xAxis, List<ChartViewFieldDTO> yAxis, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, List<ChartViewFieldDTO> extBubble, Datasource ds, ChartViewWithBLOBs view) {
+    public String getSQLScatter(String table, List<ChartViewFieldDTO> xAxis, List<ChartViewFieldDTO> yAxis, FilterTreeObj fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, List<ChartViewFieldDTO> extBubble, List<ChartViewFieldDTO> extGroup, Datasource ds, ChartViewWithBLOBs view) {
         SQLObj tableObj = SQLObj.builder()
                 .tableName((table.startsWith("(") && table.endsWith(")")) ? table : String.format(EsSqlLConstants.KEYWORD_TABLE, table))
                 .tableAlias(String.format(TABLE_ALIAS_PREFIX, 0))
                 .build();
         List<SQLObj> xFields = new ArrayList<>();
         List<SQLObj> xOrders = new ArrayList<>();
+
+        boolean xIsNumber = false;
+        List<ChartViewFieldDTO> xAxisList = new ArrayList<>();
+
+        //先判断x轴内是不是数值格式的
         if (CollectionUtils.isNotEmpty(xAxis)) {
-            for (int i = 0; i < xAxis.size(); i++) {
-                ChartViewFieldDTO x = xAxis.get(i);
+            if (StringUtils.equals(xAxis.get(0).getGroupType(), "q") && StringUtils.equalsIgnoreCase(view.getRender(), "antv")) {
+                xIsNumber = true;
+            } else {
+                xAxisList.addAll(xAxis);
+            }
+        }
+
+        //然后是数值格式的情况还需要传extGroup
+        if (xIsNumber && CollectionUtils.isNotEmpty(extGroup)) {
+            xAxisList.addAll(extGroup);
+        }
+
+        if (CollectionUtils.isNotEmpty(xAxisList)) {
+            for (int i = 0; i < xAxisList.size(); i++) {
+                ChartViewFieldDTO x = xAxisList.get(i);
                 String originField;
                 if (ObjectUtils.isNotEmpty(x.getExtField()) && x.getExtField() == 2) {
                     // 解析origin name中有关联的字段生成sql表达式
@@ -646,6 +682,9 @@ public class EsQueryProvider extends QueryProvider {
         List<String> yWheres = new ArrayList<>();
         List<SQLObj> yOrders = new ArrayList<>();
         List<ChartViewFieldDTO> yList = new ArrayList<>();
+        if (xIsNumber) {
+            yList.add(xAxis.get(0));
+        }
         yList.addAll(yAxis);
         yList.addAll(extBubble);
         if (CollectionUtils.isNotEmpty(yList)) {
@@ -680,7 +719,7 @@ public class EsQueryProvider extends QueryProvider {
             }
         }
         // 处理视图中字段过滤
-        String customWheres = transCustomFilterList(tableObj, fieldCustomFilter);
+        String customWheres = transChartFilterTrees(tableObj, fieldCustomFilter);
         // 处理仪表板字段过滤
         String extWheres = transExtFilterList(tableObj, extFilterRequestList);
         // row permissions tree
@@ -722,8 +761,160 @@ public class EsQueryProvider extends QueryProvider {
     }
 
     @Override
-    public String getSQLAsTmpScatter(String table, List<ChartViewFieldDTO> xAxis, List<ChartViewFieldDTO> yAxis, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, List<ChartViewFieldDTO> extBubble, ChartViewWithBLOBs view) {
-        return getSQLScatter("(" + sqlFix(table) + ")", xAxis, yAxis, fieldCustomFilter, rowPermissionsTree, extFilterRequestList, extBubble, null, view);
+    public String getSQLAsTmpScatter(String table, List<ChartViewFieldDTO> xAxis, List<ChartViewFieldDTO> yAxis, FilterTreeObj fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, List<ChartViewFieldDTO> extBubble, List<ChartViewFieldDTO> extGroup, ChartViewWithBLOBs view) {
+        return getSQLScatter("(" + sqlFix(table) + ")", xAxis, yAxis, fieldCustomFilter, rowPermissionsTree, extFilterRequestList, extBubble, extGroup, null, view);
+    }
+
+    @Override
+    public String getSQLRangeBar(String table, List<ChartViewFieldDTO> baseXAxis, List<ChartViewFieldDTO> xAxis, List<ChartViewFieldDTO> yAxis, FilterTreeObj fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, List<ChartViewFieldDTO> extStack, Datasource ds, ChartViewWithBLOBs view) {
+        SQLObj tableObj = SQLObj.builder()
+                .tableName((table.startsWith("(") && table.endsWith(")")) ? table : String.format(EsSqlLConstants.KEYWORD_TABLE, table))
+                .tableAlias(String.format(TABLE_ALIAS_PREFIX, 0))
+                .build();
+        List<SQLObj> xFields = new ArrayList<>();
+        List<SQLObj> xFields2Tail = new ArrayList<>();
+        List<SQLObj> xOrders = new ArrayList<>();
+
+        List<SQLObj> yFields = new ArrayList<>(); // 要把两个时间字段放进y里面
+        List<String> yWheres = new ArrayList<>();
+        List<SQLObj> yOrders = new ArrayList<>();
+
+        boolean ifAggregate = BooleanUtils.isTrue(view.getAggregate());
+
+        if (CollectionUtils.isNotEmpty(xAxis)) {
+            for (int i = 0; i < xAxis.size(); i++) {
+                ChartViewFieldDTO x = xAxis.get(i);
+                String originField;
+
+                if (StringUtils.equalsIgnoreCase(x.getGroupType(), "q")) {
+                    if (ObjectUtils.isNotEmpty(x.getExtField()) && x.getExtField() == DeTypeConstants.DE_INT) {
+                        // 解析origin name中有关联的字段生成sql表达式
+                        originField = calcFieldRegex(x.getOriginName(), tableObj);
+                    } else if (ObjectUtils.isNotEmpty(x.getExtField()) && x.getExtField() == DeTypeConstants.DE_TIME) {
+                        originField = String.format(EsSqlLConstants.KEYWORD_FIX, tableObj.getTableAlias(), x.getOriginName());
+                    } else {
+                        if (x.getDeType() == 2) {
+                            originField = String.format(EsSqlLConstants.CAST, String.format(EsSqlLConstants.KEYWORD_FIX, tableObj.getTableAlias(), x.getOriginName()), "bigint");
+                        } else if (x.getDeType() == 3) {
+                            originField = String.format(EsSqlLConstants.CAST, String.format(EsSqlLConstants.KEYWORD_FIX, tableObj.getTableAlias(), x.getOriginName()), "float");
+                        } else {
+                            originField = String.format(EsSqlLConstants.KEYWORD_FIX, tableObj.getTableAlias(), x.getOriginName());
+                        }
+                    }
+                    String fieldAlias = String.format(SQLConstants.FIELD_ALIAS_Y_PREFIX, i);
+                    // 处理纵轴字段
+                    yFields.add(getYFields(x, originField, fieldAlias));
+                    // 处理纵轴过滤
+                    yWheres.add(getYWheres(x, originField, fieldAlias));
+                    // 处理纵轴排序
+                    if (StringUtils.isNotEmpty(x.getSort()) && Utils.joinSort(x.getSort())) {
+                        yOrders.add(SQLObj.builder()
+                                .orderField(originField)
+                                .orderAlias(fieldAlias)
+                                .orderDirection(x.getSort())
+                                .build());
+                    }
+                    continue;
+                }
+
+                if (ObjectUtils.isNotEmpty(x.getExtField()) && x.getExtField() == DeTypeConstants.DE_INT) {
+                    // 解析origin name中有关联的字段生成sql表达式
+                    originField = calcFieldRegex(x.getOriginName(), tableObj);
+                } else if (ObjectUtils.isNotEmpty(x.getExtField()) && x.getExtField() == DeTypeConstants.DE_TIME) {
+                    originField = String.format(EsSqlLConstants.KEYWORD_FIX, tableObj.getTableAlias(), x.getOriginName());
+                } else {
+                    if (x.getDeType() == 2 || x.getDeType() == 3) {
+                        originField = String.format(EsSqlLConstants.CAST, String.format(EsSqlLConstants.KEYWORD_FIX, tableObj.getTableAlias(), x.getOriginName()), "double");
+                    } else {
+                        originField = String.format(EsSqlLConstants.KEYWORD_FIX, tableObj.getTableAlias(), x.getOriginName());
+                    }
+                }
+                String fieldAlias = String.format(SQLConstants.FIELD_ALIAS_X_PREFIX, i);
+
+                if (ifAggregate) {
+                    if (i == baseXAxis.size()) {// 起止时间
+                        String fieldName = String.format(EsSqlLConstants.AGG_FIELD, "min", originField);
+                        yFields.add(getXFields(x, fieldName, fieldAlias));
+
+                        yWheres.add(getYWheres(x, originField, fieldAlias));
+
+                    } else if (i == baseXAxis.size() + 1) {
+                        String fieldName = String.format(EsSqlLConstants.AGG_FIELD, "max", originField);
+
+                        yFields.add(getXFields(x, fieldName, fieldAlias));
+
+                        yWheres.add(getYWheres(x, originField, fieldAlias));
+                    } else {
+                        // 处理横轴字段
+                        xFields.add(getXFields(x, originField, fieldAlias));
+                    }
+                } else {
+                    if (i == baseXAxis.size() || i == baseXAxis.size() + 1) {// 起止时间
+                        xFields2Tail.add(getXFields(x, originField, fieldAlias));
+                    } else {
+                        xFields.add(getXFields(x, originField, fieldAlias));
+                    }
+                }
+
+                // 处理横轴排序
+                if (StringUtils.isNotEmpty(x.getSort()) && Utils.joinSort(x.getSort())) {
+                    xOrders.add(SQLObj.builder()
+                            .orderField(originField)
+                            .orderAlias(fieldAlias)
+                            .orderDirection(x.getSort())
+                            .build());
+                }
+            }
+            if (!ifAggregate) { //把起止时间放到数组最后
+                xFields.addAll(xFields2Tail);
+            }
+        }
+
+        // 处理视图中字段过滤
+        String customWheres = transChartFilterTrees(tableObj, fieldCustomFilter);
+        // 处理仪表板字段过滤
+        String extWheres = transExtFilterList(tableObj, extFilterRequestList);
+        // row permissions tree
+        String whereTrees = transFilterTrees(tableObj, rowPermissionsTree);
+        // 构建sql所有参数
+        List<SQLObj> fields = new ArrayList<>();
+        fields.addAll(xFields);
+        fields.addAll(yFields);
+        List<String> wheres = new ArrayList<>();
+        if (customWheres != null) wheres.add(customWheres);
+        if (extWheres != null) wheres.add(extWheres);
+        if (whereTrees != null) wheres.add(whereTrees);
+        List<SQLObj> groups = new ArrayList<>();
+        groups.addAll(xFields);
+        // 外层再次套sql
+        List<SQLObj> orders = new ArrayList<>();
+        orders.addAll(xOrders);
+        orders.addAll(yOrders);
+        List<String> aggWheres = new ArrayList<>();
+        aggWheres.addAll(yWheres.stream().filter(ObjectUtils::isNotEmpty).collect(Collectors.toList()));
+
+        STGroup stg = new STGroupFile(SQLConstants.SQL_TEMPLATE);
+        ST st_sql = stg.getInstanceOf("querySql");
+        if (CollectionUtils.isNotEmpty(xFields)) st_sql.add("groups", xFields);
+        if (CollectionUtils.isNotEmpty(yFields)) st_sql.add("aggregators", yFields);
+        if (CollectionUtils.isNotEmpty(wheres)) st_sql.add("filters", wheres);
+        if (ObjectUtils.isNotEmpty(tableObj)) st_sql.add("table", tableObj);
+        String sql = st_sql.render();
+
+        ST st = stg.getInstanceOf("querySql");
+        SQLObj tableSQL = SQLObj.builder()
+                .tableName(String.format(EsSqlLConstants.BRACKETS, sql))
+                .tableAlias(String.format(TABLE_ALIAS_PREFIX, 1))
+                .build();
+        if (CollectionUtils.isNotEmpty(aggWheres)) st.add("filters", aggWheres);
+        if (CollectionUtils.isNotEmpty(orders)) st.add("orders", orders);
+        if (ObjectUtils.isNotEmpty(tableSQL)) st.add("table", tableSQL);
+        return sqlLimit(st.render(), view);
+    }
+
+    @Override
+    public String getSQLAsTmpRangeBar(String table, List<ChartViewFieldDTO> baseXAxis, List<ChartViewFieldDTO> xAxis, List<ChartViewFieldDTO> yAxis, FilterTreeObj fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, List<ChartViewFieldDTO> extStack, ChartViewWithBLOBs view) {
+        return getSQLRangeBar("(" + table + ")", baseXAxis, xAxis, yAxis, fieldCustomFilter, rowPermissionsTree, extFilterRequestList, extStack, null, view);
     }
 
     @Override
@@ -732,7 +923,7 @@ public class EsQueryProvider extends QueryProvider {
     }
 
     @Override
-    public String getSQLSummary(String table, List<ChartViewFieldDTO> yAxis, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, ChartViewWithBLOBs view, Datasource ds) {
+    public String getSQLSummary(String table, List<ChartViewFieldDTO> yAxis, FilterTreeObj fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, ChartViewWithBLOBs view, Datasource ds) {
         // 字段汇总 排序等
         SQLObj tableObj = SQLObj.builder()
                 .tableName((table.startsWith("(") && table.endsWith(")")) ? table : String.format(EsSqlLConstants.KEYWORD_TABLE, table))
@@ -773,7 +964,7 @@ public class EsQueryProvider extends QueryProvider {
             }
         }
         // 处理视图中字段过滤
-        String customWheres = transCustomFilterList(tableObj, fieldCustomFilter);
+        String customWheres = transChartFilterTrees(tableObj, fieldCustomFilter);
         // 处理仪表板字段过滤
         String extWheres = transExtFilterList(tableObj, extFilterRequestList);
         // row permissions tree
@@ -811,7 +1002,7 @@ public class EsQueryProvider extends QueryProvider {
     }
 
     @Override
-    public String getSQLSummaryAsTmp(String sql, List<ChartViewFieldDTO> yAxis, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, ChartViewWithBLOBs view) {
+    public String getSQLSummaryAsTmp(String sql, List<ChartViewFieldDTO> yAxis, FilterTreeObj fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, ChartViewWithBLOBs view) {
         return getSQLSummary("(" + sqlFix(sql) + ")", yAxis, fieldCustomFilter, rowPermissionsTree, extFilterRequestList, view, null);
     }
 
@@ -842,6 +1033,82 @@ public class EsQueryProvider extends QueryProvider {
 
     @Override
     public String transTreeItem(SQLObj tableObj, DatasetRowPermissionsTreeItem item) {
+        String res = null;
+        DatasetTableField field = item.getField();
+
+        if (ObjectUtils.isEmpty(field)) {
+            return null;
+        }
+        String whereName = "";
+        String originName;
+        if (ObjectUtils.isNotEmpty(field.getExtField()) && field.getExtField() == 2) {
+            // 解析origin name中有关联的字段生成sql表达式
+            originName = calcFieldRegex(field.getOriginName(), tableObj);
+        } else if (ObjectUtils.isNotEmpty(field.getExtField()) && field.getExtField() == 1) {
+            originName = String.format(EsSqlLConstants.KEYWORD_FIX, tableObj.getTableAlias(), field.getOriginName());
+        } else {
+            originName = String.format(EsSqlLConstants.KEYWORD_FIX, tableObj.getTableAlias(), field.getOriginName());
+        }
+        if (field.getDeType() == DeTypeConstants.DE_TIME) {
+            if (field.getDeExtractType() == 0 || field.getDeExtractType() == 5) {
+                whereName = String.format(EsSqlLConstants.STR_TO_DATE, originName, StringUtils.isNotEmpty(field.getDateFormat()) ? field.getDateFormat() : EsSqlLConstants.DEFAULT_DATE_FORMAT, EsSqlLConstants.DEFAULT_DATE_FORMAT);
+            }
+            if (field.getDeExtractType() == DeTypeConstants.DE_INT || field.getDeExtractType() == DeTypeConstants.DE_FLOAT || field.getDeExtractType() == DeTypeConstants.DE_BOOL) {
+                String cast = String.format(EsSqlLConstants.CAST, originName, "timestamp");
+                whereName = String.format(EsSqlLConstants.DATETIME_FORMAT, cast, EsSqlLConstants.DEFAULT_DATE_FORMAT);
+            }
+            if (field.getDeExtractType() == 1) {
+                whereName = originName;
+            }
+        } else if (field.getDeType() == 2 || field.getDeType() == 3) {
+            if (field.getDeExtractType() == 0 || field.getDeExtractType() == 5) {
+                whereName = String.format(EsSqlLConstants.CAST, originName, "double");
+            }
+            if (field.getDeExtractType() == 1) {
+                whereName = String.format(EsSqlLConstants.CAST, originName, "bigint");
+            }
+            if (field.getDeExtractType() == 2 || field.getDeExtractType() == 3 || field.getDeExtractType() == 4) {
+                whereName = originName;
+            }
+        } else {
+            whereName = originName;
+        }
+
+        if (StringUtils.equalsIgnoreCase(item.getFilterType(), "enum")) {
+            if (CollectionUtils.isNotEmpty(item.getEnumValue())) {
+                res = "(" + whereName + " IN ('" + String.join("','", item.getEnumValue()) + "'))";
+            }
+        } else {
+            String value = item.getValue();
+            String whereTerm = transMysqlFilterTerm(item.getTerm());
+            String whereValue = "";
+
+            if (StringUtils.equalsIgnoreCase(item.getTerm(), "null")) {
+                whereValue = "";
+            } else if (StringUtils.equalsIgnoreCase(item.getTerm(), "not_null")) {
+                whereValue = "";
+            } else if (StringUtils.equalsIgnoreCase(item.getTerm(), "empty")) {
+                whereValue = "''";
+            } else if (StringUtils.equalsIgnoreCase(item.getTerm(), "not_empty")) {
+                whereValue = "''";
+            } else if (StringUtils.containsIgnoreCase(item.getTerm(), "in") || StringUtils.containsIgnoreCase(item.getTerm(), "not in")) {
+                whereValue = "('" + String.join("','", value.split(",")) + "')";
+            } else if (StringUtils.containsIgnoreCase(item.getTerm(), "like")) {
+                whereValue = "'%" + value + "%'";
+            } else {
+                whereValue = String.format(EsSqlLConstants.WHERE_VALUE_VALUE, value);
+            }
+            SQLObj build = SQLObj.builder()
+                    .whereField(whereName)
+                    .whereTermAndValue(whereTerm + whereValue)
+                    .build();
+            res = build.getWhereField() + " " + build.getWhereTermAndValue();
+        }
+        return res;
+    }
+
+    @Override
+    public String transTreeItem(SQLObj tableObj, FilterTreeItem item) {
         String res = null;
         DatasetTableField field = item.getField();
 
@@ -958,6 +1225,7 @@ public class EsQueryProvider extends QueryProvider {
         }
     }
 
+    @Deprecated
     public String transCustomFilterList(SQLObj tableObj, List<ChartFieldCustomFilterDTO> requestList) {
         if (CollectionUtils.isEmpty(requestList)) {
             return null;
@@ -1089,7 +1357,7 @@ public class EsQueryProvider extends QueryProvider {
                         whereName = String.format(EsSqlLConstants.DATETIME_FORMAT, cast, format);
                     }
                     if (field.getDeExtractType() == 1) {
-                        whereName = String.format(EsSqlLConstants.DATETIME_FORMAT, originName, format);
+                        whereName = originName;
                     }
                 } else if (field.getDeType() == 2 || field.getDeType() == 3) {
                     if (field.getDeExtractType() == 0 || field.getDeExtractType() == 5) {
@@ -1288,27 +1556,54 @@ public class EsQueryProvider extends QueryProvider {
     }
 
     private String calcFieldRegex(String originField, SQLObj tableObj) {
-        originField = originField.replaceAll("[\\t\\n\\r]]", "");
-        // 正则提取[xxx]
-        String regex = "\\[(.*?)]";
-        Pattern pattern = Pattern.compile(regex);
-        Matcher matcher = pattern.matcher(originField);
-        Set<String> ids = new HashSet<>();
-        while (matcher.find()) {
-            String id = matcher.group(1);
-            ids.add(id);
+        try {
+            int i = 0;
+            return buildCalcField(originField, tableObj, i);
+        } catch (Exception e) {
+            DataEaseException.throwException(Translator.get("i18n_field_circular_ref"));
         }
-        if (CollectionUtils.isEmpty(ids)) {
+        return null;
+    }
+
+    private String buildCalcField(String originField, SQLObj tableObj, int i) throws Exception {
+        try {
+            i++;
+            if (i > 100) {
+                DataEaseException.throwException(Translator.get("i18n_field_circular_error"));
+            }
+            originField = originField.replaceAll("[\\t\\n\\r]]", "");
+            // 正则提取[xxx]
+            String regex = "\\[(.*?)]";
+            Pattern pattern = Pattern.compile(regex);
+            Matcher matcher = pattern.matcher(originField);
+            Set<String> ids = new HashSet<>();
+            while (matcher.find()) {
+                String id = matcher.group(1);
+                ids.add(id);
+            }
+            if (CollectionUtils.isEmpty(ids)) {
+                return originField;
+            }
+            DatasetTableFieldExample datasetTableFieldExample = new DatasetTableFieldExample();
+            datasetTableFieldExample.createCriteria().andIdIn(new ArrayList<>(ids));
+            List<DatasetTableField> calcFields = datasetTableFieldMapper.selectByExample(datasetTableFieldExample);
+            for (DatasetTableField ele : calcFields) {
+                if (StringUtils.containsIgnoreCase(originField, ele.getId() + "")) {
+                    // 计算字段允许二次引用，这里递归查询完整引用链
+                    if (Objects.equals(ele.getExtField(), 0)) {
+                        originField = originField.replaceAll("\\[" + ele.getId() + "]",
+                                String.format(EsSqlLConstants.KEYWORD_FIX, tableObj.getTableAlias(), ele.getOriginName()));
+                    } else {
+                        originField = originField.replaceAll("\\[" + ele.getId() + "]", ele.getOriginName());
+                        originField = buildCalcField(originField, tableObj, i);
+                    }
+                }
+            }
             return originField;
+        } catch (Exception e) {
+            DataEaseException.throwException(Translator.get("i18n_field_circular_error"));
         }
-        DatasetTableFieldExample datasetTableFieldExample = new DatasetTableFieldExample();
-        datasetTableFieldExample.createCriteria().andIdIn(new ArrayList<>(ids));
-        List<DatasetTableField> calcFields = datasetTableFieldMapper.selectByExample(datasetTableFieldExample);
-        for (DatasetTableField ele : calcFields) {
-            originField = originField.replaceAll("\\[" + ele.getId() + "]",
-                    String.format(EsSqlLConstants.KEYWORD_FIX, tableObj.getTableAlias(), ele.getOriginName()));
-        }
-        return originField;
+        return null;
     }
 
     private String sqlLimit(String sql, ChartViewWithBLOBs view) {

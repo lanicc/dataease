@@ -9,7 +9,7 @@
       class="arrow-right"
       @click="showLeft = true"
     >
-      <i class="el-icon-d-arrow-right"/>
+      <i class="el-icon-d-arrow-right" />
     </p>
     <div
       v-show="showLeft"
@@ -73,44 +73,37 @@
           v-model="checkTableList"
           size="small"
         >
-          <el-tooltip
+          <div
             v-for="t in tableData"
             :key="t.name"
-            :disabled="t.enableCheck"
-            effect="dark"
-            :content="$t('dataset.table_already_add_to') + ': ' + t.datasetPath"
-            placement="right"
+            :class="[
+              { active: activeName === t.name, 'not-allow': !t.enableCheck }
+            ]"
+            class="item"
+            :title="t.name"
+            @click="setActiveName(t)"
           >
-            <div
-              :class="[
-                { active: activeName === t.name, 'not-allow': !t.enableCheck }
-              ]"
-              class="item"
-              :title="t.name"
-              @click="setActiveName(t)"
+            <svg-icon
+              v-if="!t.enableCheck"
+              icon-class="Checkbox"
+              style="margin-right: 8px"
+            />
+            <el-checkbox
+              v-else
+              :label="t.name"
+              :disabled="!t.enableCheck"
+            />
+            <span class="label">{{ showTableNameWithComment(t) }}</span>
+            <span
+              v-if="t.nameExist"
+              class="error-name-exist"
             >
               <svg-icon
-                v-if="!t.enableCheck"
-                icon-class="Checkbox"
-                style="margin-right: 8px"
+                icon-class="exclamationmark"
+                class="ds-icon-scene"
               />
-              <el-checkbox
-                v-else
-                :label="t.name"
-                :disabled="!t.enableCheck"
-              />
-              <span class="label">{{ showTableNameWithComment(t) }}</span>
-              <span
-                v-if="t.nameExist"
-                class="error-name-exist"
-              >
-                <svg-icon
-                  icon-class="exclamationmark"
-                  class="ds-icon-scene"
-                />
-              </span>
-            </div>
-          </el-tooltip>
+            </span>
+          </div>
         </el-checkbox-group>
       </div>
     </div>
@@ -179,8 +172,8 @@
           class="data"
         >
           <span class="result-num">{{
-              `${$t('dataset.preview_show')} 1000 ${$t('dataset.preview_item')}`
-            }}</span>
+            `${$t('dataset.preview_show')} 1000 ${$t('dataset.preview_item')}`
+          }}</span>
           <div class="table-grid">
             <ux-grid
               ref="plxTable"
@@ -292,6 +285,9 @@ export default {
         this.activeName = ''
         this.activeTable = {}
         const dsName = this.options.find((ele) => ele.id === val).name
+        this.$currentHttpRequestList.forEach((item, key) => {
+          key.indexOf('/datasource/getTables/') > -1 && item('Operation canceled by the user.')
+        })
         post('/datasource/getTables/' + val, {}).then((response) => {
           this.tables = response.data
           this.tables.forEach((ele) => {
@@ -340,6 +336,7 @@ export default {
     this.initDataSource()
     window.addEventListener('resize', this.calHeight)
     this.calHeight()
+    this.$emit('setSaveDisabled', false)
   },
   activated() {
     this.initDataSource()
@@ -516,7 +513,7 @@ export default {
     height: 100%;
     width: 240px;
     padding: 16px 12px;
-    font-family: PingFang SC;
+    font-family: AlibabaPuHuiTi;
     border-right: 1px solid rgba(31, 35, 41, 0.15);
 
     .select-ds {
@@ -554,7 +551,7 @@ export default {
         align-items: center;
         box-sizing: border-box;
         padding: 12px;
-        font-family: PingFang SC;
+        font-family: AlibabaPuHuiTi;
         font-size: 14px;
         font-weight: 400;
         color: var(--deTextPrimary, #1f2329);
@@ -599,7 +596,7 @@ export default {
   }
 
   .table-detail {
-    font-family: PingFang SC;
+    font-family: AlibabaPuHuiTi;
     flex: 1;
     overflow: hidden;
 
@@ -647,7 +644,7 @@ export default {
       .result-num {
         font-weight: 400;
         display: inline-block;
-        font-family: PingFang SC;
+        font-family: AlibabaPuHuiTi;
         color: var(--deTextSecondary, #646a73);
         margin-bottom: 16px;
       }

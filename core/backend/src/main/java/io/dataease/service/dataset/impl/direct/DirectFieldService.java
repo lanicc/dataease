@@ -1,8 +1,8 @@
 package io.dataease.service.dataset.impl.direct;
 
 import cn.hutool.core.collection.CollectionUtil;
+import cn.hutool.core.util.ArrayUtil;
 import com.google.gson.Gson;
-import io.dataease.commons.exception.DEException;
 import io.dataease.commons.model.BaseTreeNode;
 import io.dataease.commons.utils.BeanUtils;
 import io.dataease.commons.utils.LogUtil;
@@ -15,8 +15,9 @@ import io.dataease.plugins.common.base.domain.DatasetTable;
 import io.dataease.plugins.common.base.domain.DatasetTableField;
 import io.dataease.plugins.common.base.domain.Datasource;
 import io.dataease.plugins.common.constants.DatasetType;
-import io.dataease.plugins.common.dto.chart.ChartFieldCustomFilterDTO;
 import io.dataease.plugins.common.dto.datasource.DeSortField;
+import io.dataease.plugins.common.exception.DataEaseException;
+import io.dataease.plugins.common.request.chart.filter.FilterTreeObj;
 import io.dataease.plugins.common.request.datasource.DatasourceRequest;
 import io.dataease.plugins.common.request.permission.DataSetRowPermissionsTreeDTO;
 import io.dataease.plugins.datasource.provider.Provider;
@@ -58,14 +59,14 @@ public class DirectFieldService implements DataSetFieldService {
     public List<Object> fieldValues(String fieldId, Long userId, Boolean userPermissions, Boolean rowAndColumnMgm) throws Exception {
         List<String> fieldIds = new ArrayList<>();
         fieldIds.add(fieldId);
-        return fieldValues(fieldIds, null, userId, userPermissions, false, rowAndColumnMgm);
+        return fieldValues(fieldIds, null, userId, userPermissions, false, rowAndColumnMgm, null);
     }
 
     @Override
-    public List<Object> fieldValues(String fieldId, DeSortDTO sortDTO, Long userId, Boolean userPermissions, Boolean rowAndColumnMgm) throws Exception {
+    public List<Object> fieldValues(String fieldId, DeSortDTO sortDTO, Long userId, Boolean userPermissions, Boolean rowAndColumnMgm, String keyword) throws Exception {
         List<String> fieldIds = new ArrayList<>();
         fieldIds.add(fieldId);
-        return fieldValues(fieldIds, sortDTO, userId, userPermissions, false, rowAndColumnMgm);
+        return fieldValues(fieldIds, sortDTO, userId, userPermissions, false, rowAndColumnMgm, keyword);
     }
 
     public List<DeSortField> buildSorts(List<DatasetTableField> allFields, DeSortDTO sortDTO) {
@@ -87,19 +88,20 @@ public class DirectFieldService implements DataSetFieldService {
         }
         String id = sortDTO.getId();
         String sortStr = StringUtils.equalsIgnoreCase("chineseDesc", id) ? "desc" : "asc";
-        List<Object> result = CollectionUtil.sort(list, (v1, v2) -> {
+
+        return CollectionUtil.sort(list, (v1, v2) -> {
             Collator instance = Collator.getInstance(Locale.CHINESE);
+            if (ObjectUtils.isEmpty(v1) || ObjectUtils.isEmpty(v2)) return 0;
             if (StringUtils.equals("desc", sortStr)) {
                 return instance.compare(v2, v1);
             }
             return instance.compare(v1, v2);
         });
-
-        return result;
     }
 
+
     @Override
-    public List<Object> fieldValues(List<String> fieldIds, DeSortDTO sortDTO, Long userId, Boolean userPermissions, Boolean needMapping, Boolean rowAndColumnMgm) throws Exception {
+    public List<Object> fieldValues(List<String> fieldIds, DeSortDTO sortDTO, Long userId, Boolean userPermissions, Boolean needMapping, Boolean rowAndColumnMgm, String keyword) throws Exception {
         String fieldId = fieldIds.get(0);
         DatasetTableField field = dataSetTableFieldsService.selectByPrimaryKey(fieldId);
         if (field == null || StringUtils.isEmpty(field.getTableId())) return null;
@@ -112,16 +114,16 @@ public class DirectFieldService implements DataSetFieldService {
 
         List<DeSortField> deSortFields = buildSorts(fields, sortDTO);
 
-        Boolean needSort = CollectionUtils.isNotEmpty(deSortFields);
+        boolean needSort = CollectionUtils.isNotEmpty(deSortFields);
 
         final List<String> allTableFieldIds = fields.stream().map(DatasetTableField::getId).collect(Collectors.toList());
         boolean multi = fieldIds.stream().anyMatch(item -> !allTableFieldIds.contains(item));
         if (multi && needMapping) {
-            DEException.throwException("Cross multiple dataset is not supported");
+            DataEaseException.throwException(Translator.get("i18n_dataset_cross_multiple"));
         }
 
         List<DatasetTableField> permissionFields = fields;
-        List<ChartFieldCustomFilterDTO> customFilter = new ArrayList<>();
+        FilterTreeObj customFilter = new FilterTreeObj();
         List<DataSetRowPermissionsTreeDTO> rowPermissionsTree = new ArrayList<>();
         if (userPermissions) {
             //列权限
@@ -148,10 +150,10 @@ public class DirectFieldService implements DataSetFieldService {
             }
         }
 
-
         DatasourceRequest datasourceRequest = new DatasourceRequest();
         Provider datasourceProvider = null;
         String createSQL = null;
+        Long calcLimit = needMapping ? null : 100000L;
         if (datasetTable.getMode() == 0) {// 直连
             if (StringUtils.isEmpty(datasetTable.getDataSourceId())) return null;
             Datasource ds = datasourceService.get(datasetTable.getDataSourceId());
@@ -165,25 +167,27 @@ public class DirectFieldService implements DataSetFieldService {
             QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
             if (StringUtils.equalsIgnoreCase(datasetTable.getType(), DatasetType.DB.toString())) {
                 datasourceRequest.setTable(dataTableInfoDTO.getTable());
-                createSQL = qp.createQuerySQL(dataTableInfoDTO.getTable(), permissionFields, !needSort, ds, customFilter, rowPermissionsTree, deSortFields);
+                createSQL = qp.createQuerySQL(dataTableInfoDTO.getTable(), permissionFields, !needSort, ds, customFilter, rowPermissionsTree, deSortFields, calcLimit, keyword);
             } else if (StringUtils.equalsIgnoreCase(datasetTable.getType(), DatasetType.SQL.toString())) {
                 String sql = dataTableInfoDTO.getSql();
                 if (dataTableInfoDTO.isBase64Encryption()) {
                     sql = new String(java.util.Base64.getDecoder().decode(sql));
                 }
                 sql = dataSetTableService.handleVariableDefaultValue(sql, null, ds.getType(), false);
-                createSQL = qp.createQuerySQLAsTmp(sql, permissionFields, !needSort, customFilter, rowPermissionsTree, deSortFields);
+                createSQL = qp.createQuerySQLAsTmp(sql, permissionFields, !needSort, customFilter, rowPermissionsTree, deSortFields, calcLimit, keyword);
             } else if (StringUtils.equalsIgnoreCase(datasetTable.getType(), DatasetType.CUSTOM.toString())) {
                 DataTableInfoDTO dt = new Gson().fromJson(datasetTable.getInfo(), DataTableInfoDTO.class);
                 List<DataSetTableUnionDTO> listUnion = dataSetTableUnionService.listByTableId(dt.getList().get(0).getTableId());
                 String sql = dataSetTableService.getCustomSQLDatasource(dt, listUnion, ds);
-                createSQL = qp.createQuerySQLAsTmp(sql, permissionFields, !needSort, customFilter, rowPermissionsTree, deSortFields);
+                createSQL = qp.createQuerySQLAsTmp(sql, permissionFields, !needSort, customFilter, rowPermissionsTree, deSortFields, calcLimit, keyword);
             } else if (StringUtils.equalsIgnoreCase(datasetTable.getType(), DatasetType.UNION.toString())) {
                 DataTableInfoDTO dt = new Gson().fromJson(datasetTable.getInfo(), DataTableInfoDTO.class);
                 String sql = (String) dataSetTableService.getUnionSQLDatasource(dt, ds).get("sql");
-                createSQL = qp.createQuerySQLAsTmp(sql, permissionFields, !needSort, customFilter, rowPermissionsTree, deSortFields);
+                createSQL = qp.createQuerySQLAsTmp(sql, permissionFields, !needSort, customFilter, rowPermissionsTree, deSortFields, calcLimit, keyword);
             }
-            datasourceRequest.setQuery(qp.createSQLPreview(createSQL, null));
+            // datasourceRequest.setQuery(needMapping ? createSQL : qp.createSQLPreview(createSQL, null));
+            datasourceRequest.setQuery(createSQL);
+
         } else if (datasetTable.getMode() == 1) {// 抽取
             // 连接doris，构建doris数据源查询
             Datasource ds = engineService.getDeEngine();
@@ -193,18 +197,36 @@ public class DirectFieldService implements DataSetFieldService {
             String tableName = "ds_" + datasetTable.getId().replaceAll("-", "_");
             datasourceRequest.setTable(tableName);
             QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
-            createSQL = qp.createQuerySQL(tableName, permissionFields, !needSort, null, customFilter, rowPermissionsTree, deSortFields);
-            datasourceRequest.setQuery(qp.createSQLPreview(createSQL, null));
+            createSQL = qp.createQuerySQL(tableName, permissionFields, !needSort, null, customFilter, rowPermissionsTree, deSortFields, calcLimit, keyword);
+            datasourceRequest.setQuery(createSQL);
         }
+        permissionFields = permissionFields.stream().filter(f -> fieldIds.contains(f.getId())).collect(Collectors.toList());
+        int originSize = permissionFields.size();
+        boolean existExtSortField = false;
+        if (CollectionUtils.isNotEmpty(deSortFields)) {
+            List<String> fieldList = permissionFields.stream().map(DatasetTableField::getId).collect(Collectors.toList());
+            for (DeSortField sField : deSortFields) {
+                int indexOf = fieldList.indexOf(sField.getId());
+                if (indexOf == -1) {
+                    existExtSortField = true;
+                    permissionFields.add(sField);
+                } else {
+                    permissionFields.set(indexOf, sField);
+                }
+            }
+        }
+
         LogUtil.info(datasourceRequest.getQuery());
         datasourceRequest.setPermissionFields(permissionFields);
+        assert datasourceProvider != null;
         List<String[]> rows = datasourceProvider.getData(datasourceRequest);
         if (!needMapping) {
-            List<Object> results = rows.stream().map(row -> row[0]).distinct().collect(Collectors.toList());
-            return results;
+            return rows.stream().map(row -> row[0]).distinct().limit(1000L).collect(Collectors.toList());
         }
         Set<String> pkSet = new HashSet<>();
-
+        if (CollectionUtils.isNotEmpty(rows) && existExtSortField && originSize > 0) {
+            rows = rows.stream().map(row -> ArrayUtil.sub(row, 0, originSize)).collect(Collectors.toList());
+        }
         List<BaseTreeNode> treeNodes = rows.stream().map(row -> buildTreeNode(row, pkSet)).flatMap(Collection::stream).collect(Collectors.toList());
         List tree = TreeUtils.mergeDuplicateTree(treeNodes, TreeUtils.DEFAULT_ROOT);
         return tree;

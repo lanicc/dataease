@@ -1,6 +1,7 @@
 package io.dataease.service.chart.util;
 
 import cn.hutool.core.util.ArrayUtil;
+import io.dataease.controller.request.chart.ChartDrillRequest;
 import io.dataease.dto.chart.*;
 import io.dataease.plugins.common.base.domain.ChartViewWithBLOBs;
 import io.dataease.plugins.common.dto.chart.ChartViewFieldDTO;
@@ -11,6 +12,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -291,19 +293,35 @@ public class ChartDataBuild {
     }
 
     //AntV scatter
-    public static Map<String, Object> transScatterDataAntV(List<ChartViewFieldDTO> xAxis, List<ChartViewFieldDTO> yAxis, ChartViewWithBLOBs view, List<String[]> data, List<ChartViewFieldDTO> extBubble, boolean isDrill) {
+    public static Map<String, Object> transScatterDataAntV(List<ChartViewFieldDTO> xAxis, List<ChartViewFieldDTO> yAxis, ChartViewWithBLOBs view, List<String[]> data, List<ChartViewFieldDTO> extBubble, List<ChartViewFieldDTO> extGroup, boolean isDrill) {
         Map<String, Object> map = new HashMap<>();
+
+        boolean xIsNumber = false;
+
+        //先判断x轴内是不是数值格式的
+        if (CollectionUtils.isNotEmpty(xAxis)) {
+            if (StringUtils.equals(xAxis.get(0).getGroupType(), "q")) {
+                xIsNumber = true;
+            }
+        }
+        List<ChartViewFieldDTO> extGroupList = new ArrayList<>();
+        List<ChartViewFieldDTO> extBaseGroupList = new ArrayList<>();
+        if (xIsNumber) {
+            extGroupList.addAll(extGroup);
+            extBaseGroupList.addAll(extGroup.stream().filter(d -> !d.isDrill()).collect(Collectors.toList()));
+        }
+
 
         List<AxisChartDataAntVDTO> dataList = new ArrayList<>();
         for (int i1 = 0; i1 < data.size(); i1++) {
             String[] row = data.get(i1);
 
             StringBuilder a = new StringBuilder();
-            if (isDrill) {
-                a.append(row[xAxis.size() - 1]);
+            if (isDrill && !xIsNumber) {
+                a.append(row[extGroupList.size() + xAxis.size() - 1]);
             } else {
-                for (int i = 0; i < xAxis.size(); i++) {
-                    if (i == xAxis.size() - 1) {
+                for (int i = extGroupList.size(); i < extGroupList.size() + xAxis.size(); i++) {
+                    if (i == extGroupList.size() + xAxis.size() - 1) {
                         a.append(row[i]);
                     } else {
                         a.append(row[i]).append("\n");
@@ -311,23 +329,44 @@ public class ChartDataBuild {
                 }
             }
 
-            for (int i = xAxis.size(); i < xAxis.size() + yAxis.size(); i++) {
+            for (int i = xAxis.size() + extGroupList.size(); i < xAxis.size() + extGroupList.size() + yAxis.size(); i++) {
                 AxisChartDataAntVDTO axisChartDataDTO = new AxisChartDataAntVDTO();
+
+                if (xIsNumber) {
+                    Object v = a.toString();
+                    try {
+                        v = new BigDecimal(a.toString());
+                    } catch (Exception ignore) {
+                    }
+                    axisChartDataDTO.setX(v);
+                } else {
+                    axisChartDataDTO.setX(a.toString());
+                }
+
                 axisChartDataDTO.setField(a.toString());
                 axisChartDataDTO.setName(a.toString());
 
                 List<ChartDimensionDTO> dimensionList = new ArrayList<>();
                 List<ChartQuotaDTO> quotaList = new ArrayList<>();
 
-                for (int j = 0; j < xAxis.size(); j++) {
-                    ChartDimensionDTO chartDimensionDTO = new ChartDimensionDTO();
-                    chartDimensionDTO.setId(xAxis.get(j).getId());
-                    chartDimensionDTO.setValue(row[j]);
-                    dimensionList.add(chartDimensionDTO);
+                if (xIsNumber && CollectionUtils.isNotEmpty(extGroupList)) {
+                    for (int j = 0; j < extGroupList.size(); j++) {
+                        ChartDimensionDTO chartDimensionDTO = new ChartDimensionDTO();
+                        chartDimensionDTO.setId(extGroupList.get(j).getId());
+                        chartDimensionDTO.setValue(row[j]);
+                        dimensionList.add(chartDimensionDTO);
+                    }
+                } else {
+                    for (int j = 0; j < xAxis.size(); j++) {
+                        ChartDimensionDTO chartDimensionDTO = new ChartDimensionDTO();
+                        chartDimensionDTO.setId(xAxis.get(j).getId());
+                        chartDimensionDTO.setValue(row[j]);
+                        dimensionList.add(chartDimensionDTO);
+                    }
                 }
                 axisChartDataDTO.setDimensionList(dimensionList);
 
-                int j = i - xAxis.size();
+                int j = i - xAxis.size() - extGroupList.size();
                 ChartQuotaDTO chartQuotaDTO = new ChartQuotaDTO();
                 chartQuotaDTO.setId(yAxis.get(j).getId());
                 quotaList.add(chartQuotaDTO);
@@ -337,11 +376,31 @@ public class ChartDataBuild {
                 } catch (Exception e) {
                     axisChartDataDTO.setValue(new BigDecimal(0));
                 }
-                axisChartDataDTO.setCategory(yAxis.get(j).getName());
+
+                if (CollectionUtils.isNotEmpty(extGroup) && xIsNumber) { //有分组时其实就是第一个
+                    String catalog = null;
+                    if (isDrill) {
+                        catalog = row[extGroupList.size() - 1];
+                    } else {
+                        catalog = row[0];
+                    }
+                    axisChartDataDTO.setCategory(StringUtils.defaultIfBlank(catalog, "null"));
+
+                    if (!extBaseGroupList.isEmpty()) {
+                        axisChartDataDTO.setField(row[extBaseGroupList.size() - 1]);
+                    } else {
+                        axisChartDataDTO.setField(yAxis.get(j).getName());
+                    }
+
+                } else {
+                    axisChartDataDTO.setCategory(yAxis.get(j).getName());
+                }
+                axisChartDataDTO.setGroup(yAxis.get(j).getName());
+
                 // pop
                 if (CollectionUtils.isNotEmpty(extBubble)) {
                     try {
-                        axisChartDataDTO.setPopSize(StringUtils.isEmpty(row[xAxis.size() + yAxis.size()]) ? null : new BigDecimal(row[xAxis.size() + yAxis.size()]));
+                        axisChartDataDTO.setPopSize(StringUtils.isEmpty(row[extGroupList.size() + xAxis.size() + yAxis.size()]) ? null : new BigDecimal(row[extGroupList.size() + xAxis.size() + yAxis.size()]));
                     } catch (Exception e) {
                         axisChartDataDTO.setPopSize(new BigDecimal(0));
                     }
@@ -944,7 +1003,28 @@ public class ChartDataBuild {
     // 表格
     public static Map<String, Object> transTableNormal(List<ChartViewFieldDTO> xAxis, List<ChartViewFieldDTO> yAxis, ChartViewWithBLOBs view, List<String[]> data, List<ChartViewFieldDTO> extStack, Map<String, ColumnPermissionItem> desensitizationList) {
         List<ChartViewFieldDTO> fields = new ArrayList<>();
-        if (ObjectUtils.isNotEmpty(xAxis)) {
+
+        // scatter start
+        if (StringUtils.containsIgnoreCase(view.getType(), "scatter")) {
+            boolean xIsNumber = false;
+
+            if (CollectionUtils.isNotEmpty(xAxis)) {
+                if (StringUtils.equals(xAxis.get(0).getGroupType(), "q")) {
+                    xIsNumber = true;
+                }
+            }
+            if (xIsNumber && CollectionUtils.isNotEmpty(extStack)) {
+                fields.addAll(extStack);
+            }
+
+            if (xIsNumber) {
+                fields.add(xAxis.get(0));
+            } else {
+                fields.addAll(xAxis);
+            }
+
+            // scatter end
+        } else if (ObjectUtils.isNotEmpty(xAxis)) {
             fields.addAll(xAxis);
         }
         if (StringUtils.containsIgnoreCase(view.getType(), "stack")) {
@@ -974,15 +1054,19 @@ public class ChartDataBuild {
         tableRow.forEach(row -> {
             String key = xAxis.stream().map(x -> String.format(format, row.get(x.getDataeaseName()).toString())).collect(Collectors.joining("-de-"));
             List<String[]> detailFieldValueList = groupDataList.get(key);
-            List<Map<String, Object>> detailValueMapList = detailFieldValueList.stream().map((detailArr -> {
-                Map<String, Object> temp = new HashMap<>();
-                for (int i = 0; i < realDetailFields.size(); i++) {
-                    ChartViewFieldDTO realDetailField = realDetailFields.get(i);
-                    temp.put(realDetailField.getDataeaseName(), detailArr[detailIndex + i]);
-                }
-                return temp;
-            })).collect(Collectors.toList());
-            row.put("details", detailValueMapList);
+            if (CollectionUtils.isNotEmpty(detailFieldValueList)) {
+                List<Map<String, Object>> detailValueMapList = detailFieldValueList.stream().map((detailArr -> {
+                    Map<String, Object> temp = new HashMap<>();
+                    for (int i = 0; i < realDetailFields.size(); i++) {
+                        ChartViewFieldDTO realDetailField = realDetailFields.get(i);
+                        temp.put(realDetailField.getDataeaseName(), detailArr[detailIndex + i]);
+                    }
+                    return temp;
+                })).collect(Collectors.toList());
+                row.put("details", detailValueMapList);
+            } else {
+                row.put("details", new ArrayList<>());
+            }
         });
 
         ChartViewFieldDTO detailFieldDTO = new ChartViewFieldDTO();
@@ -998,30 +1082,18 @@ public class ChartDataBuild {
 
     // 表格
     public static Map<String, Object> transTableNormal(Map<String, List<ChartViewFieldDTO>> fieldMap, ChartViewWithBLOBs view, List<String[]> data, Map<String, ColumnPermissionItem> desensitizationList) {
+        String[] keys = new String[]{"labelAxis", "tooltipAxis"};
 
         List<ChartViewFieldDTO> fields = new ArrayList<>();
         List<ChartViewFieldDTO> yfields = new ArrayList<>();
         if (CollectionUtils.isNotEmpty(fieldMap.get("xAxis"))) fields.addAll(fieldMap.get("xAxis"));
-        if (CollectionUtils.isNotEmpty(fieldMap.get("tooltipAxis"))) {
-            fieldMap.get("tooltipAxis").forEach(field -> {
-                Integer deType = field.getDeType();
-                if (deType == 2 || deType == 3) {
-                    yfields.add(field);
-                } else {
-                    fields.add(field);
-                }
-            });
+
+        for (Map.Entry<String, List<ChartViewFieldDTO>> entry : fieldMap.entrySet()) {
+            if (StringUtils.equalsAny(entry.getKey(), keys)) {
+                fields.addAll(entry.getValue());
+            }
         }
-        if (CollectionUtils.isNotEmpty(fieldMap.get("labelAxis"))) {
-            fieldMap.get("labelAxis").forEach(field -> {
-                Integer deType = field.getDeType();
-                if (deType == 2 || deType == 3) {
-                    yfields.add(field);
-                } else {
-                    fields.add(field);
-                }
-            });
-        }
+
         if (CollectionUtils.isNotEmpty(fieldMap.get("yAxis"))) fields.addAll(fieldMap.get("yAxis"));
         if (CollectionUtils.isNotEmpty(yfields)) fields.addAll(yfields);
         return transTableNormal(fields, view, data, desensitizationList);
@@ -1212,6 +1284,153 @@ public class ChartDataBuild {
         }
     }
 
+    private static String getDateFormat(String dateStyle, String datePattern) {
+        String split;
+        if (StringUtils.equalsIgnoreCase(datePattern, "date_split")) {
+            split = "/";
+        } else {
+            split = "-";
+        }
+        switch (dateStyle) {
+            case "y":
+                return "yyyy";
+            case "y_M":
+                return "yyyy" + split + "MM";
+            case "y_M_d":
+                return "yyyy" + split + "MM" + split + "dd";
+            case "H_m_s":
+                return "HH:mm:ss";
+            case "y_M_d_H":
+                return "yyyy" + split + "MM" + split + "dd" + " HH";
+            case "y_M_d_H_m":
+                return "yyyy" + split + "MM" + split + "dd" + " HH:mm";
+            case "y_M_d_H_m_s":
+                return "yyyy" + split + "MM" + split + "dd" + " HH:mm:ss";
+            default:
+                return "yyyy-MM-dd HH:mm:ss";
+        }
+    }
+
+    public static Map<String, Object> transTimeBarDataAntV(List<ChartViewFieldDTO> xAxisBase, List<ChartViewFieldDTO> xAxis, List<ChartViewFieldDTO> xAxisExt, List<ChartViewFieldDTO> yAxis, List<ChartViewFieldDTO> extStack, List<String[]> data, ChartViewWithBLOBs view, boolean isDrill, List<ChartDrillRequest> drillRequestList) {
+
+        Map<String, Object> map = new HashMap<>();
+        if (CollectionUtils.isEmpty(xAxisBase) || CollectionUtils.isEmpty(xAxisExt) || xAxisExt.size() < 2) {
+            map.put("data", new ArrayList<>());
+            return map;
+        }
+        if (xAxisExt.stream().filter(ext -> !ext.isDrill()).count() != 2) {
+            map.put("data", new ArrayList<>());
+            return map;
+        }
+
+        List<Date> dates = new ArrayList<>();
+        List<BigDecimal> numbers = new ArrayList<>();
+
+        ChartViewFieldDTO xAxis1 = xAxis.get(xAxisBase.size());
+        boolean isDate = true;
+        if (StringUtils.equalsIgnoreCase(xAxis1.getGroupType(), "q")) {
+            isDate = false;
+        }
+        SimpleDateFormat sdf = null;
+        if (isDate) {
+            sdf = new SimpleDateFormat(getDateFormat(xAxis1.getDateStyle(), xAxis1.getDatePattern()));
+        }
+
+        List<Object> dataList = new ArrayList<>();
+        for (int i1 = 0; i1 < data.size(); i1++) {
+            String[] row = data.get(i1);
+
+            StringBuilder xField = new StringBuilder();
+            if (isDrill) {
+                xField.append(row[xAxis.size() - 1 - 2]); // 由于起止时间字段是放到最后的yField里去查询的，所以要再减两个
+            } else {
+                for (int i = 0; i < xAxisBase.size(); i++) {
+                    if (i == xAxisBase.size() - 1) {
+                        xField.append(row[i]);
+                    } else {
+                        xField.append(row[i]).append("\n");
+                    }
+                }
+            }
+            Map<String, Object> obj = new HashMap<>();
+            obj.put("field", xField.toString());
+            obj.put("category", xField.toString());
+
+            List<ChartDimensionDTO> dimensionList = new ArrayList<>();
+
+            for (int j = 0; j < xAxis.size(); j++) {
+                if (j == xAxisBase.size() || j == xAxisBase.size() + 1) {
+                    continue;
+                }
+                int index = j;
+                if (j > xAxisBase.size() + 1) {
+                    index = j - 2;
+                }
+                ChartDimensionDTO chartDimensionDTO = new ChartDimensionDTO();
+                chartDimensionDTO.setId(xAxis.get(j).getId());
+                chartDimensionDTO.setValue(row[index]);
+                dimensionList.add(chartDimensionDTO);
+            }
+
+            obj.put("dimensionList", dimensionList);
+
+            List<Object> values = new ArrayList<>();
+
+            // 由于起止时间字段是放到最后的yField里去查询的，所以拿倒数两个
+            if (row[xAxis.size() - 1] == null || row[xAxis.size() - 2] == null) {
+                continue;
+            }
+
+            if (isDate) {
+                values.add(row[xAxis.size() - 2]);
+                values.add(row[xAxis.size() - 1]);
+                obj.put("values", values);
+                try {
+                    Date date = sdf.parse(row[xAxis.size() - 2]);
+                    if (date != null) {
+                        dates.add(date);
+                    }
+                } catch (Exception ignore) {
+                }
+                try {
+                    Date date = sdf.parse(row[xAxis.size() - 1]);
+                    if (date != null) {
+                        dates.add(date);
+                    }
+                } catch (Exception ignore) {
+                }
+            } else {
+                values.add(new BigDecimal(row[xAxis.size() - 2]));
+                values.add(new BigDecimal(row[xAxis.size() - 1]));
+                obj.put("values", values);
+
+                numbers.add(new BigDecimal(row[xAxis.size() - 2]));
+                numbers.add(new BigDecimal(row[xAxis.size() - 1]));
+            }
+
+            dataList.add(obj);
+        }
+
+        if (isDate) {
+            Date minDate = dates.stream().min(Date::compareTo).orElse(null);
+            if (minDate != null) {
+                map.put("minTime", sdf.format(minDate));
+            }
+            Date maxDate = dates.stream().max(Date::compareTo).orElse(null);
+            if (maxDate != null) {
+                map.put("maxTime", sdf.format(maxDate));
+            }
+        } else {
+            map.put("min", numbers.stream().min(BigDecimal::compareTo).orElse(null));
+            map.put("max", numbers.stream().max(BigDecimal::compareTo).orElse(null));
+        }
+
+        map.put("isDate", isDate);
+        map.put("data", dataList);
+        return map;
+
+    }
+
     public static Map<String, Object> transBidirectionalBarData(List<ChartViewFieldDTO> xAxis, List<ChartViewFieldDTO> yAxis, ChartViewDTO view, List<String[]> data, boolean isDrill) {
         Map<String, Object> map = new HashMap<>();
 
@@ -1253,7 +1472,7 @@ public class ChartDataBuild {
                 quotaList.add(chartQuotaDTO);
                 axisChartDataDTO.setQuotaList(quotaList);
             }
-            if (yAxis.size() == 2){
+            if (yAxis.size() == 2) {
                 try {
                     axisChartDataDTO.setValue(StringUtils.isEmpty(row[xAxis.size()]) ? null : new BigDecimal(row[xAxis.size()]));
                 } catch (Exception e) {

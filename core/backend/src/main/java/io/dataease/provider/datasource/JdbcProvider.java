@@ -5,22 +5,27 @@ import com.alibaba.druid.pool.DruidPooledConnection;
 import com.google.gson.Gson;
 import io.dataease.commons.utils.LogUtil;
 import io.dataease.dto.datasource.*;
-import io.dataease.exception.DataEaseException;
+
 import io.dataease.i18n.Translator;
 import io.dataease.plugins.common.base.domain.Datasource;
 import io.dataease.plugins.common.base.domain.DeDriver;
 import io.dataease.plugins.common.base.mapper.DeDriverMapper;
 import io.dataease.plugins.common.constants.DatasourceTypes;
 import io.dataease.plugins.common.constants.datasource.MySQLConstants;
+import io.dataease.plugins.common.dto.datasource.DataSourceType;
 import io.dataease.plugins.common.dto.datasource.TableField;
+import io.dataease.plugins.common.exception.DataEaseException;
 import io.dataease.plugins.common.request.datasource.DatasourceRequest;
+import io.dataease.plugins.common.util.SpringContextUtil;
 import io.dataease.plugins.datasource.entity.JdbcConfiguration;
+import io.dataease.plugins.datasource.entity.Status;
 import io.dataease.plugins.datasource.provider.DefaultJdbcProvider;
 import io.dataease.plugins.datasource.provider.ExtendedJdbcClassLoader;
 import io.dataease.plugins.datasource.query.QueryProvider;
 import io.dataease.provider.ProviderFactory;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+
 import javax.annotation.Resource;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
@@ -97,7 +102,8 @@ public class JdbcProvider extends DefaultJdbcProvider {
             }
             String schemaPattern = "%";
             if (datasourceRequest.getDatasource().getType().equalsIgnoreCase(DatasourceTypes.oracle.name())) {
-                schemaPattern = databaseMetaData.getUserName();
+                OracleConfiguration oracleConfiguration = new Gson().fromJson(datasourceRequest.getDatasource().getConfiguration(), OracleConfiguration.class);
+                schemaPattern = oracleConfiguration.getSchema();
             }
             ResultSet resultSet = databaseMetaData.getColumns(null, schemaPattern, tableNamePattern, "%");
             while (resultSet.next()) {
@@ -365,6 +371,22 @@ public class JdbcProvider extends DefaultJdbcProvider {
     }
 
     @Override
+    public Status checkDsStatus(DatasourceRequest datasourceRequest) throws Exception {
+        Status status = new Status();
+        String queryStr = getTablesSql(datasourceRequest);
+        JdbcConfiguration jdbcConfiguration = new Gson().fromJson(datasourceRequest.getDatasource().getConfiguration(), JdbcConfiguration.class);
+        int queryTimeout = jdbcConfiguration.getQueryTimeout() > 0 ? jdbcConfiguration.getQueryTimeout() : 0;
+        try (Connection con = getConnection(datasourceRequest); Statement statement = getStatement(con, queryTimeout); ResultSet resultSet = statement.executeQuery(queryStr)) {
+            status.setVersion(String.valueOf(con.getMetaData().getDatabaseMajorVersion()));
+        } catch (Exception e) {
+            LogUtil.error("Datasource is invalid: " + datasourceRequest.getDatasource().getName(), e);
+            DataEaseException.throwException(e.getMessage());
+        }
+        status.setStatus("Success");
+        return status;
+    }
+
+    @Override
     public String checkStatus(DatasourceRequest datasourceRequest) throws Exception {
         String queryStr = getTablesSql(datasourceRequest);
         JdbcConfiguration jdbcConfiguration = new Gson().fromJson(datasourceRequest.getDatasource().getConfiguration(), JdbcConfiguration.class);
@@ -372,7 +394,7 @@ public class JdbcProvider extends DefaultJdbcProvider {
         try (Connection con = getConnection(datasourceRequest); Statement statement = getStatement(con, queryTimeout); ResultSet resultSet = statement.executeQuery(queryStr)) {
         } catch (Exception e) {
             LogUtil.error("Datasource is invalid: " + datasourceRequest.getDatasource().getName(), e);
-            io.dataease.plugins.common.exception.DataEaseException.throwException(e.getMessage());
+            DataEaseException.throwException(e.getMessage());
         }
         return "Success";
     }
@@ -509,16 +531,23 @@ public class JdbcProvider extends DefaultJdbcProvider {
         }
 
         Connection conn;
+        String surpportVersions = null;
         String driverClassName;
         ExtendedJdbcClassLoader jdbcClassLoader;
         if (isDefaultClassLoader(customDriver)) {
             driverClassName = defaultDriver;
             jdbcClassLoader = extendedJdbcClassLoader;
+            for (DataSourceType value : SpringContextUtil.getApplicationContext().getBeansOfType(DataSourceType.class).values()) {
+                if(value.getType().equalsIgnoreCase(datasourceRequest.getDatasource().getType())){
+                    surpportVersions = value.getSurpportVersions();
+                }
+            }
         } else {
             if (deDriver == null) {
                 deDriver = deDriverMapper.selectByPrimaryKey(customDriver);
             }
             driverClassName = deDriver.getDriverClass();
+            surpportVersions = deDriver.getSurpportVersions();
             jdbcClassLoader = getCustomJdbcClassLoader(deDriver);
         }
 
@@ -532,6 +561,12 @@ public class JdbcProvider extends DefaultJdbcProvider {
             throw e;
         } finally {
             Thread.currentThread().setContextClassLoader(classLoader);
+        }
+
+        if(StringUtils.isNotEmpty(surpportVersions) && surpportVersions.split(",").length > 0){
+            if(! Arrays.asList(surpportVersions.split(",")).contains(String.valueOf(conn.getMetaData().getDatabaseMajorVersion()))){
+                DataEaseException.throwException("当前驱动不支持此版本!");
+            };
         }
         return conn;
     }
@@ -786,7 +821,7 @@ public class JdbcProvider extends DefaultJdbcProvider {
             case StarRocks:
                 MysqlConfiguration mysqlConfiguration = new Gson().fromJson(datasource.getConfiguration(), MysqlConfiguration.class);
                 mysqlConfiguration.getJdbc();
-                if(!mysqlConfiguration.getDataBase().matches("^[0-9a-zA-Z_.-]{1,}$")){
+                if(!mysqlConfiguration.getDataBase().matches("^[ 0-9a-zA-Z_.-]{1,}$")){
                     throw new Exception("Invalid database name");
                 }
                 break;

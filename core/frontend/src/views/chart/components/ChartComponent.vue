@@ -144,7 +144,9 @@ export default {
         'line',
         'line-stack',
         'scatter'
-      ]
+      ],
+      resizeTimer: null,
+      renderTimer: null
     }
   },
 
@@ -467,6 +469,25 @@ export default {
         }
       }
       const chart_option = baseMapOption(base_json, geoJson, chart, this.buttonTextColor, curAreaCode, this.currentSeriesId)
+      if (chart_option.series?.length) {
+        const dataNames = []
+        chart_option.series.filter(se => se.type === 'map').forEach(se => {
+          se.data.forEach(d => {
+            if (d?.name) {
+              dataNames.push(d.name)
+            }
+          })
+        })
+        for (const key in chart_option.geo.nameMap) {
+          if (Object.hasOwnProperty.call(chart_option.geo.nameMap, key)) {
+            const element = chart_option.geo.nameMap[key]
+            if (element && !dataNames.includes(element)) {
+              chart_option.geo.nameMap[key] = key
+            }
+          }
+        }
+      }
+
       this.myEcharts(chart_option)
       const opt = this.myChart.getOption()
       if (opt && opt.series) {
@@ -479,7 +500,11 @@ export default {
       // 指定图表的配置项和数据
       const chart = this.myChart
       this.setBackGroundBorder()
-      setTimeout(chart.setOption(option, true), 500)
+      this.renderTimer && clearTimeout(this.renderTimer)
+      this.renderTimer = setTimeout(() => {
+        chart.clear()
+        chart.setOption(option, true)
+      }, 500)
       window.removeEventListener('resize', chart.resize)
     },
     setBackGroundBorder() {
@@ -492,9 +517,16 @@ export default {
     },
     chartResize() {
       // 指定图表的配置项和数据
-      const chart = this.myChart
-      chart.resize()
-      this.reDrawMap()
+      this.resizeTimer && clearTimeout(this.resizeTimer)
+      this.resizeTimer = setTimeout(() => {
+        const { offsetWidth, offsetHeight } = document.getElementById(this.chartId)
+        const chartWidth = this.myChart.getWidth()
+        const chartHeight = this.myChart.getHeight()
+        if (offsetWidth !== chartWidth || offsetHeight !== chartHeight) {
+          this.myChart.resize()
+          this.reDrawMap()
+        }
+      }, 100)
     },
     reDrawMap() {
       const chart = this.chart

@@ -80,6 +80,7 @@
         :out-style="getShapeStyleInt(item.style)"
         :active="item === curComponent"
         :h="getShapeStyleIntDeDrag(item.style,'height')"
+        @filter-loaded="filterLoaded"
       />
       <component
         :is="item.component"
@@ -126,7 +127,7 @@
       :canvas-id="canvasId"
     />
     <!-- 右击菜单 -->
-    <ContextMenu/>
+    <ContextMenu />
 
     <!-- 对齐标线 -->
     <span
@@ -170,13 +171,13 @@ import DeOutWidget from '@/components/dataease/DeOutWidget'
 import DragShadow from '@/components/deDrag/Shadow'
 import bus from '@/utils/bus'
 import LinkJumpSet from '@/views/panel/linkJumpSet'
-import { buildFilterMap, buildViewKeyMap, formatCondition, valueValid, viewIdMatch } from '@/utils/conditionUtil'
+import { buildFilterMap, buildViewKeyMap, formatCondition, valueValid, viewIdMatch, buildAfterFilterLoaded } from '@/utils/conditionUtil'
 // 挤占式画布
 import _ from 'lodash'
 import _jq from 'jquery'
 import Background from '@/views/background/index'
 import PointShadow from '@/components/deDrag/PointShadow'
-import {hexColorToRGBA} from "@/views/chart/chart/util";
+import { hexColorToRGBA } from '@/views/chart/chart/util'
 
 // let positionBox = []
 // let coordinates = [] // 坐标点集合
@@ -885,6 +886,7 @@ export default {
         originWidth: 80, // 原始尺寸
         originHeight: 20
       },
+      filterMapCache: {},
       showDrag: true,
       vLine: [],
       hLine: [],
@@ -1004,6 +1006,7 @@ export default {
       return this.curCanvasScaleMap[this.canvasId]
     },
     ...mapState([
+      'canvasStyleData',
       'curComponent',
       'editor',
       'linkageSettingStatus',
@@ -1024,6 +1027,18 @@ export default {
     },
     filterMap() {
       const result = buildFilterMap(this.componentData)
+      Object.keys(result).forEach(ele => {
+        if (this.filterMapCache[ele]?.length) {
+          result[ele].forEach(itx => {
+            const condition = this.filterMapCache[ele].find(item => item.componentId === itx.componentId && itx.cacheObj)
+            if (condition) {
+              itx.cacheObj = condition.cacheObj
+            }
+          })
+        } else {
+          this.filterMapCache[ele] = result[ele]
+        }
+      })
       if (this.searchButtonInfo && this.searchButtonInfo.buttonExist && !this.searchButtonInfo.autoTrigger && this.searchButtonInfo.relationFilterIds) {
         for (const key in result) {
           if (Object.hasOwnProperty.call(result, key)) {
@@ -1116,6 +1131,7 @@ export default {
     this.$store.commit('getEditor')
     const _this = this
     eventBus.$on('hideArea', this.hideArea)
+    eventBus.$on('componentSizeAdaptorChange', this.changeScale)
     eventBus.$on('startMoveIn', this.startMoveIn)
     bus.$on('onRemoveLastItem', this.removeLastItem)
     bus.$on('trigger-search-button', this.triggerSearchButton)
@@ -1132,19 +1148,22 @@ export default {
   beforeDestroy() {
     eventBus.$off('hideArea', this.hideArea)
     eventBus.$off('startMoveIn', this.startMoveIn)
+    eventBus.$off('componentSizeAdaptorChange', this.changeScale)
     bus.$off('onRemoveLastItem', this.removeLastItem)
     bus.$off('trigger-search-button', this.triggerSearchButton)
     bus.$off('refresh-button-info', this.refreshButtonInfo)
     bus.$off('trigger-reset-button', this.triggerResetButton)
   },
-  created() {
-  },
   methods: {
+    filterLoaded(p) {
+      buildAfterFilterLoaded(this.filterMap, p)
+      this.filterMapCache = {}
+    },
     getWrapperChildRefs() {
       return this.$refs['wrapperChild']
     },
     getAllWrapperChildRefs() {
-      let allChildRefs = []
+      const allChildRefs = []
       const currentChildRefs = this.getWrapperChildRefs()
       if (currentChildRefs && currentChildRefs.length > 0) {
         allChildRefs.push.apply(allChildRefs, currentChildRefs)
@@ -1251,7 +1270,10 @@ export default {
         }
         param = wrapperChild.getCondition && wrapperChild.getCondition()
         const condition = formatCondition(param)
-        const vValid = valueValid(condition)
+        let vValid = valueValid(condition)
+        const required = element.options.attrs.required
+        condition.requiredInvalid = required && !vValid
+        vValid = vValid || required
         const filterComponentId = condition.componentId
         const conditionCanvasId = wrapperChild.getCanvasId && wrapperChild.getCanvasId()
         Object.keys(result).forEach(viewId => {
@@ -1523,8 +1545,8 @@ export default {
           })
         if (this.canvasId === 'canvas-main') {
           this.$store.commit('setPreviewCanvasScale', {
-            scaleWidth: this.scalePointWidth,
-            scaleHeight: this.scalePointHeight
+            scaleWidth: this.canvasStyleData.autoSizeAdaptor ? this.scalePointWidth : 1,
+            scaleHeight: this.canvasStyleData.autoSizeAdaptor ? this.scalePointHeight : 1
           })
         }
       }
@@ -1686,10 +1708,6 @@ export default {
       const resizeItem = _.get(infoBox, 'resizeItem')
       const vm = this
       vm.$set(resizeItem, 'isPlayer', true)
-      const startX = infoBox.startX
-      const startY = infoBox.startY
-      const moveXSize = e.pageX - startX // X方向移动的距离
-      const moveYSize = e.pageY - startY // Y方向移动的距离
       let nowX = Math.round(item.style.width * this.matrixScaleWidth)
       let nowY = Math.round(item.style.height * this.matrixScaleHeight)
       nowX = nowX > 0 ? nowX : 1

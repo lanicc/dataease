@@ -9,7 +9,6 @@ import io.dataease.auth.annotation.DePermissions;
 import io.dataease.auth.filter.F2CLinkFilter;
 import io.dataease.commons.constants.DePermissionType;
 import io.dataease.commons.constants.ResourceAuthLevel;
-import io.dataease.commons.exception.DEException;
 import io.dataease.controller.request.dataset.DataSetTableRequest;
 import io.dataease.controller.request.dataset.MultFieldValuesRequest;
 import io.dataease.controller.response.DatasetTableField4Type;
@@ -18,6 +17,7 @@ import io.dataease.i18n.Translator;
 import io.dataease.plugins.common.base.domain.DatasetTable;
 import io.dataease.plugins.common.base.domain.DatasetTableField;
 import io.dataease.plugins.common.base.domain.Datasource;
+import io.dataease.plugins.common.exception.DataEaseException;
 import io.dataease.plugins.datasource.entity.Dateformat;
 import io.dataease.plugins.datasource.query.QueryProvider;
 import io.dataease.plugins.xpack.auth.dto.request.ColumnPermissionItem;
@@ -167,7 +167,7 @@ public class DataSetTableFieldController {
             BeanUtils.copyProperties(datasetTable, dataSetTableRequest);
             dataSetTableService.getPreviewData(dataSetTableRequest, 1, 1, Collections.singletonList(datasetTableField), null);
         } catch (Exception e) {
-            DEException.throwException(Translator.get("i18n_calc_field_error"));
+            DataEaseException.throwException(Translator.get("i18n_calc_field_error"));
         }
         return dataSetTableFieldsService.save(datasetTableField);
     }
@@ -214,7 +214,7 @@ public class DataSetTableFieldController {
     public List<Object> multFieldValues(@RequestBody MultFieldValuesRequest multFieldValuesRequest) throws Exception {
         List<Object> results = new ArrayList<>();
         for (String fieldId : multFieldValuesRequest.getFieldIds()) {
-            List<Object> fieldValues = dataSetFieldService.fieldValues(fieldId, multFieldValuesRequest.getSort(), multFieldValuesRequest.getUserId(), true, false);
+            List<Object> fieldValues = dataSetFieldService.fieldValues(fieldId, multFieldValuesRequest.getSort(), multFieldValuesRequest.getUserId(), true, false, multFieldValuesRequest.getKeyword());
             if (CollectionUtil.isNotEmpty(fieldValues)) {
                 results.addAll(fieldValues);
             }
@@ -233,13 +233,13 @@ public class DataSetTableFieldController {
         DecodedJWT jwt = JWT.decode(linkToken);
         Long userId = jwt.getClaim("userId").asLong();
         multFieldValuesRequest.setUserId(userId);
-        return dataSetFieldService.fieldValues(multFieldValuesRequest.getFieldIds(), multFieldValuesRequest.getSort(), multFieldValuesRequest.getUserId(), true, true, false);
+        return dataSetFieldService.fieldValues(multFieldValuesRequest.getFieldIds(), multFieldValuesRequest.getSort(), multFieldValuesRequest.getUserId(), true, true, false, multFieldValuesRequest.getKeyword());
     }
 
     @ApiIgnore
     @PostMapping("mappingFieldValues")
     public List<Object> mappingFieldValues(@RequestBody MultFieldValuesRequest multFieldValuesRequest) throws Exception {
-        return dataSetFieldService.fieldValues(multFieldValuesRequest.getFieldIds(), multFieldValuesRequest.getSort(), multFieldValuesRequest.getUserId(), true, true, false);
+        return dataSetFieldService.fieldValues(multFieldValuesRequest.getFieldIds(), multFieldValuesRequest.getSort(), multFieldValuesRequest.getUserId(), true, true, false, multFieldValuesRequest.getKeyword());
     }
 
     @ApiIgnore

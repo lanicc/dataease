@@ -154,7 +154,7 @@
           </el-dropdown-item>
 
           <!--同比/环比等快速计算-->
-          <el-dropdown-item v-show="!item.chartId && chart.type !== 'table-info'">
+          <el-dropdown-item v-show="!item.chartId && chart.type !== 'table-info' && chart.type !== 'bar-time-range'">
             <el-dropdown
               placement="right-start"
               size="mini"
@@ -212,7 +212,7 @@
             <span>{{ $t('chart.filter') }}...</span>
           </el-dropdown-item>
           <el-dropdown-item
-            v-if="chart.render === 'antv' && chart.type !== 'gauge' && chart.type !== 'liquid'"
+            v-if="chart.render === 'antv' && chart.type !== 'gauge' && chart.type !== 'liquid' && chart.type !== 'bar-time-range'"
             icon="el-icon-notebook-2"
             divided
             :command="beforeClickItem('formatter')"
@@ -275,6 +275,10 @@ export default {
     quotaData: {
       type: Array,
       required: true
+    },
+    specialType: {
+      type: String,
+      required: false
     }
   },
   data() {
@@ -436,23 +440,35 @@ export default {
     showRename() {
       this.item.index = this.index
       this.item.renameType = 'quota'
+      if (this.specialType) {
+        this.item.renameType = this.specialType
+      }
       this.item.dsFieldName = getOriginFieldName(this.dimensionData, this.quotaData, this.item)
       this.$emit('onNameEdit', this.item)
     },
     removeItem() {
       this.item.index = this.index
       this.item.removeType = 'quota'
+      if (this.specialType) {
+        this.item.removeType = this.specialType
+      }
       this.$emit('onQuotaItemRemove', this.item)
     },
     editFilter() {
       this.item.index = this.index
       this.item.filterType = 'quota'
+      if (this.specialType) {
+        this.item.filterType = this.specialType
+      }
       this.$emit('editItemFilter', this.item)
     },
 
     editCompare() {
       this.item.index = this.index
       this.item.calcType = 'quota'
+      if (this.specialType) {
+        this.item.calcType = this.specialType
+      }
       this.$emit('editItemCompare', this.item)
     },
     getItemTagType() {
@@ -462,6 +478,9 @@ export default {
     valueFormatter() {
       this.item.index = this.index
       this.item.formatterType = 'quota'
+      if (this.specialType) {
+        this.item.formatterType = this.specialType
+      }
       this.$emit('valueFormatter', this.item)
     }
   }

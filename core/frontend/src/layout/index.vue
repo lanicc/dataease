@@ -1,11 +1,13 @@
 <template>
   <div
+    v-loading="showTips"
+    element-loading-custom-class="pwd-tips-loading"
     :class="classObj"
     class="app-wrapper"
   >
     <licbar />
     <topbar
-      v-if="!fullHeightFlag && finishLoad"
+      v-if="!fullHeightFlag"
       :show-tips="showTips"
     />
 
@@ -81,7 +83,6 @@ export default {
     return {
       componentName: 'PanelMain',
       showTips: false,
-      finishLoad: false,
       buttonDisable: false,
       sideWidth: ''
     }
@@ -123,18 +124,16 @@ export default {
     }
   },
   beforeCreate() {
-    needModifyPwd().then(res => {
-      this.showTips = res.success && res.data
-      this.finishLoad = true
-    }).catch(e => {
-      this.finishLoad = true
-    })
+    this.showTips = false
   },
   mounted() {
+    document.addEventListener('click', this.bodyClick)
     bus.$on('PanelSwitchComponent', this.panelSwitchComponent)
     bus.$on('web-seize-topic-call', this.webMsgTopicCall)
   },
   beforeDestroy() {
+    this.showTips = false
+    document.removeEventListener('click', this.bodyClick)
     bus.$off('PanelSwitchComponent', this.panelSwitchComponent)
     bus.$off('web-seize-topic-call', this.webMsgTopicCall)
   },
@@ -142,9 +141,15 @@ export default {
     showMultiLoginMsg()
   },
   methods: {
+    bodyClick(e) {
+      const dom = document.querySelector('.pwd-tips')
+      if (dom && !dom.contains(e.target)) {
+        this.showTips = false
+      }
+    },
     webMsgTopicCall(param) {
-      const ip = param
       const msg = this.$t('multi_login_lang.forced_offline')
+      // eslint-disable-next-line
       this.$error(eval(msg))
       bus.$emit('sys-logout')
     },
@@ -183,6 +188,14 @@ export default {
     &.mobile.openSidebar{
       position: fixed;
       top: 0;
+    }
+
+  }
+  ::v-deep .pwd-tips-loading {
+    z-index: 2024;
+    background-color: rgba(255, 255, 255, 0.1);
+    .el-loading-spinner {
+      display: none !important;
     }
   }
   .drawer-bg {

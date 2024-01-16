@@ -29,18 +29,18 @@
         trigger="click"
         @command="handleCommand"
       >
-        <i class="el-icon-more"/>
+        <i class="el-icon-more" />
         <el-dropdown-menu
           slot="dropdown"
           class="de-card-dropdown"
         >
           <slot>
             <el-dropdown-item command="update">
-              <i class="el-icon-edit"/>
+              <i class="el-icon-edit" />
               {{ $t('commons.update') }}
             </el-dropdown-item>
             <el-dropdown-item command="delete">
-              <i class="el-icon-delete"/>
+              <i class="el-icon-delete" />
               {{ $t('commons.uninstall') }}
             </el-dropdown-item>
             <el-dropdown-item
@@ -227,7 +227,7 @@ export default {
 }
 
 .de-model-text {
-  font-family: "PingFang SC";
+  font-family: "AlibabaPuHuiTi";
   font-style: normal;
   font-weight: 400;
   font-size: 14px;
@@ -242,7 +242,7 @@ export default {
 }
 
 .de-model-text-market {
-  font-family: "PingFang SC";
+  font-family: "AlibabaPuHuiTi";
   font-style: normal;
   color: #1f2329;
   display: inline-block;

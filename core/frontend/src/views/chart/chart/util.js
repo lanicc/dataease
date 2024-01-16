@@ -47,6 +47,8 @@ export const TYPE_CONFIGS = [
       'color-selector': [
         'tableHeaderBgColor',
         'tableItemBgColor',
+        'enableTableCrossBG',
+        'tableItemSubBgColor',
         'tableHeaderFontColor',
         'tableFontColor',
         'tableBorderColor',
@@ -61,9 +63,12 @@ export const TYPE_CONFIGS = [
         'tableTitleHeight',
         'tableItemHeight',
         'tableColumnMode',
+        'tableFreeze',
         'showIndex',
         'indexLabel',
-        'tableColTooltip'
+        'tableColTooltip',
+        'tableCellTooltip',
+        'showTableHeader'
       ],
       'title-selector-ant-v': [
         'show',
@@ -95,6 +100,8 @@ export const TYPE_CONFIGS = [
       'color-selector': [
         'tableHeaderBgColor',
         'tableItemBgColor',
+        'enableTableCrossBG',
+        'tableItemSubBgColor',
         'tableHeaderFontColor',
         'tableFontColor',
         'tableBorderColor',
@@ -113,7 +120,10 @@ export const TYPE_CONFIGS = [
         'tableColumnMode',
         'showIndex',
         'indexLabel',
-        'tableColTooltip'
+        'tableColTooltip',
+        'tableCellTooltip',
+        'showTableHeader',
+        'tableFreeze'
       ],
       'title-selector-ant-v': [
         'show',
@@ -146,6 +156,8 @@ export const TYPE_CONFIGS = [
       'color-selector': [
         'tableHeaderBgColor',
         'tableItemBgColor',
+        'enableTableCrossBG',
+        'tableItemSubBgColor',
         'tableHeaderFontColor',
         'tableFontColor',
         'tableBorderColor',
@@ -161,7 +173,8 @@ export const TYPE_CONFIGS = [
         'tableItemHeight',
         'tableColumnMode',
         'tableRowTooltip',
-        'tableColTooltip'
+        'tableColTooltip',
+        'tableCellTooltip'
       ],
       'total-cfg': [
         'row',
@@ -243,6 +256,7 @@ export const TYPE_CONFIGS = [
     propertyInner: {
       'color-selector': [
         'quotaColor',
+        'quotaSuffixColor',
         'dimensionColor'
       ],
       'size-selector-ant-v': [
@@ -259,7 +273,13 @@ export const TYPE_CONFIGS = [
         'dimensionFontShadow',
         'spaceSplit',
         'hPosition',
-        'vPosition'
+        'vPosition',
+        'quotaSuffix',
+        'quotaSuffixFontSize',
+        'quotaSuffixFontFamily',
+        'quotaSuffixFontStyle',
+        'quotaSuffixLetterSpace',
+        'quotaSuffixFontShadow'
       ],
       'title-selector-ant-v': [
         'show',
@@ -1088,6 +1108,85 @@ export const TYPE_CONFIGS = [
   {
     render: 'antv',
     category: 'chart.chart_type_compare',
+    value: 'bar-time-range',
+    title: 'chart.chart_bar_time_range',
+    icon: 'bar-time-range',
+    properties: [
+      'color-selector',
+
+      'label-selector-ant-v',
+      'tooltip-selector-ant-v',
+      'x-axis-selector-ant-v',
+      'y-axis-selector-ant-v',
+      'title-selector-ant-v',
+      'legend-selector-ant-v'
+    ],
+    propertyInner: {
+      'color-selector': [
+        'value',
+        'colorPanel',
+        'customColor',
+        'gradient',
+        'alpha'
+      ],
+      'size-selector-ant-v': [
+        'barDefault',
+        'barGap'
+      ],
+      'label-selector-ant-v': [
+        'show',
+        'fontSize',
+        'color',
+        'position-h'
+      ],
+      'tooltip-selector-ant-v': [
+        'show',
+        'textStyle'
+      ],
+      'x-axis-selector-ant-v': [
+        'show',
+        'position',
+        'name',
+        'nameTextStyle',
+        'splitLine',
+        'axisForm',
+        'axisLabel'
+      ],
+      'y-axis-selector-ant-v': [
+        'show',
+        'position',
+        'name',
+        'nameTextStyle',
+        'splitLine',
+        'axisForm',
+        'axisLabel'
+      ],
+      'title-selector-ant-v': [
+        'show',
+        'title',
+        'fontSize',
+        'color',
+        'hPosition',
+        'isItalic',
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
+      ],
+      'legend-selector-ant-v': [
+        'show',
+        'icon',
+        'orient',
+        'textStyle',
+        'hPosition',
+        'vPosition'
+      ]
+    }
+  },
+  {
+    render: 'antv',
+    category: 'chart.chart_type_compare',
     value: 'bar-stack-horizontal',
     title: 'chart.chart_bar_stack_horizontal',
     icon: 'bar-stack-horizontal',
@@ -1587,7 +1686,6 @@ export const TYPE_CONFIGS = [
       'x-axis-selector-ant-v': [
         'show',
         'position',
-        'nameTextStyle',
         'splitLine',
         'axisForm',
         'axisLabel'
@@ -1686,7 +1784,8 @@ export const TYPE_CONFIGS = [
       'split-selector-ant-v': [
         'splitForm',
         'name',
-        'lineStyle'
+        'lineStyle',
+        'axisValue'
       ]
     }
   },
@@ -1973,6 +2072,8 @@ export const TYPE_CONFIGS = [
       'color-selector': [
         'tableHeaderBgColor',
         'tableItemBgColor',
+        'enableTableCrossBG',
+        'tableItemSubBgColor',
         'tableHeaderFontColor',
         'tableFontColor',
         'tableBorderColor',
@@ -1985,9 +2086,11 @@ export const TYPE_CONFIGS = [
         'tableTitleHeight',
         'tableItemHeight',
         'tableColumnWidth',
+        'tableFreeze',
         'showIndex',
         'indexLabel',
-        'tableAutoBreakLine'
+        'tableAutoBreakLine',
+        'showTableHeader'
       ],
       'title-selector': [
         'show',
@@ -2015,6 +2118,8 @@ export const TYPE_CONFIGS = [
       'color-selector': [
         'tableHeaderBgColor',
         'tableItemBgColor',
+        'enableTableCrossBG',
+        'tableItemSubBgColor',
         'tableHeaderFontColor',
         'tableFontColor',
         'tableBorderColor',
@@ -2031,7 +2136,9 @@ export const TYPE_CONFIGS = [
         'tableColumnWidth',
         'showIndex',
         'indexLabel',
-        'tableAutoBreakLine'
+        'tableFreeze',
+        'tableAutoBreakLine',
+        'showTableHeader'
       ],
       'title-selector': [
         'show',
@@ -2108,6 +2215,7 @@ export const TYPE_CONFIGS = [
 
       'color-selector': [
         'quotaColor',
+        'quotaSuffixColor',
         'dimensionColor'
       ],
       'size-selector': [
@@ -2124,7 +2232,13 @@ export const TYPE_CONFIGS = [
         'dimensionFontShadow',
         'spaceSplit',
         'hPosition',
-        'vPosition'
+        'vPosition',
+        'quotaSuffix',
+        'quotaSuffixFontSize',
+        'quotaSuffixFontFamily',
+        'quotaSuffixFontStyle',
+        'quotaSuffixLetterSpace',
+        'quotaSuffixFontShadow'
       ],
       'title-selector': [
         'show',
@@ -3085,7 +3199,8 @@ export const TYPE_CONFIGS = [
         'axisLine',
         'axisLabel',
         'splitLine',
-        'splitArea'
+        'splitArea',
+        'axisValue'
       ],
       'title-selector': [
         'show',
@@ -3411,16 +3526,38 @@ export function customColor(custom, res, colors) {
 }
 
 export function getColors(chart, colors, reset) {
+  const ifAggregate = !!chart.aggregate
   // 自定义颜色，先按照没有设定的情况，并排好序，当做最终结果
   let seriesColors = []
   let series
-  if (chart.type.includes('stack')) {
+  if (!ifAggregate && chart.type === 'bar-time-range') {
+    if (chart.data && chart.data.data && chart.data.data.length > 0) {
+      // 只能处理field字段
+      const groups = []
+      for (let i = 0; i < chart.data.data.length; i++) {
+        const name = chart.data.data[i].field
+        if (groups.indexOf(name) < 0) {
+          groups.push(name)
+        }
+      }
+      for (let i = 0; i < groups.length; i++) {
+        const s = groups[i]
+        seriesColors.push({
+          name: s,
+          color: colors[i % colors.length],
+          isCustom: false
+        })
+      }
+    }
+  } else if (chart.type.includes('stack')) {
     if (chart.data) {
       const data = chart.data.data
       const stackData = []
-      for (let i = 0; i < data.length; i++) {
-        const s = data[i]
-        stackData.push(s.category)
+      if (data?.length) {
+        for (let i = 0; i < data.length; i++) {
+          const s = data[i]
+          stackData.push(s.category)
+        }
       }
       const sArr = stackData.filter(function(item, index, stackData) {
         return stackData.indexOf(item, 0) === index
@@ -3452,7 +3589,43 @@ export function getColors(chart, colors, reset) {
         isCustom: false
       })
     }
-  } else if (includesAny(chart.type, 'bar', 'scatter', 'radar', 'area') && !chart.type.includes('group')) {
+  } else if (chart.type === 'scatter') {
+    const xAxis = JSON.parse(chart.xaxis)
+    if (chart.data && chart.render === 'antv' && xAxis && xAxis.length > 0 && xAxis[0].groupType === 'q') {
+      const data = chart.data.data
+      const groups = []
+      for (let i = 0; i < data.length; i++) {
+        const d = data[i]
+        if (!groups.includes(d.category)) {
+          groups.push(d.category)
+        }
+      }
+      for (let i = 0; i < groups.length; i++) {
+        const s = groups[i]
+        seriesColors.push({
+          name: s,
+          color: colors[i % colors.length],
+          isCustom: false
+        })
+      }
+    } else {
+      if (Object.prototype.toString.call(chart.yaxis) === '[object Array]') {
+        series = JSON.parse(JSON.stringify(chart.yaxis))
+      } else {
+        series = JSON.parse(chart.yaxis)
+      }
+      if (series) {
+        for (let i = 0; i < series.length; i++) {
+          const s = series[i]
+          seriesColors.push({
+            name: s.name,
+            color: colors[i % colors.length],
+            isCustom: false
+          })
+        }
+      }
+    }
+  } else if ((includesAny(chart.type, 'bar', 'radar', 'area')) && !chart.type.includes('group') && chart.type !== 'bar-time-range') {
     if (Object.prototype.toString.call(chart.yaxis) === '[object Array]') {
       series = JSON.parse(JSON.stringify(chart.yaxis))
     } else {
@@ -3499,7 +3672,6 @@ export function getColors(chart, colors, reset) {
       // if (customSortData && customSortData.length > 0) {
       //   data = customSort(customSortData, data)
       // }
-
       for (let i = 0; i < data.length; i++) {
         const s = data[i]
         seriesColors.push({

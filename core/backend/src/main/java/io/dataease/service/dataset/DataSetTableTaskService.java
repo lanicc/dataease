@@ -8,12 +8,12 @@ import io.dataease.commons.utils.AuthUtils;
 import io.dataease.controller.dataset.request.DatasetTaskGridRequest;
 import io.dataease.controller.request.dataset.DataSetTaskRequest;
 import io.dataease.dto.dataset.DataSetTaskDTO;
-import io.dataease.exception.DataEaseException;
 import io.dataease.ext.ExtDataSetTaskMapper;
 import io.dataease.i18n.Translator;
 import io.dataease.plugins.common.base.domain.*;
 import io.dataease.plugins.common.base.mapper.DatasetTableMapper;
 import io.dataease.plugins.common.base.mapper.DatasetTableTaskMapper;
+import io.dataease.plugins.common.exception.DataEaseException;
 import io.dataease.service.ScheduleService;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
@@ -82,12 +82,13 @@ public class DataSetTableTaskService {
             }
             datasetTableTaskMapper.insert(datasetTableTask);
         } else {
-            datasetTableTask.setStatus(TaskStatus.Underway.name());
+            datasetTableTask.setStatus(null);
             datasetTableTask.setLastExecTime(null);
             datasetTableTask.setLastExecStatus(null);
             datasetTableTaskMapper.updateByPrimaryKeySelective(datasetTableTask);
         }
 
+        scheduleService.deleteSchedule(datasetTableTask);
         scheduleService.addSchedule(datasetTableTask);
 
         // simple
@@ -264,6 +265,8 @@ public class DataSetTableTaskService {
 
     public List<DataSetTaskDTO> taskList4User(DatasetTaskGridRequest request) {
         request.setUserId(null);
+        request.getOrders().add(0, "dataset_table_task.status desc");
+        request.getOrders().replaceAll(t -> t.replace("next_exec_time", "NEXT_FIRE_TIME"));
         if (AuthUtils.getUser().getIsAdmin()) {
             return extDataSetTaskMapper.taskList(request);
         } else {
@@ -308,6 +311,13 @@ public class DataSetTableTaskService {
         DatasetTableTask record = new DatasetTableTask();
         record.setStatus(datasetTableTask.getStatus());
         datasetTableTaskMapper.updateByExampleSelective(record, datasetTableTaskExample);
+
+        if(datasetTableTask.getStatus().equalsIgnoreCase(TaskStatus.Pending.name())){
+            scheduleService.pauseTrigger(datasetTableTask);
+        }
+        if(datasetTableTask.getStatus().equalsIgnoreCase(TaskStatus.Underway.name())){
+            scheduleService.resumeTrigger(datasetTableTask);
+        }
     }
 
     public void execTask(DatasetTableTask datasetTableTask) throws Exception {

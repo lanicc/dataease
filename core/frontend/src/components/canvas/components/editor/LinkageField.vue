@@ -24,6 +24,7 @@
             <el-select
               v-model="itemLinkage.sourceField"
               size="mini"
+              filterable
               placeholder="请选择"
             >
               <el-option
@@ -63,6 +64,7 @@
           <div class="select-filed">
             <el-select
               v-model="itemLinkage.targetField"
+              filterable
               size="mini"
               placeholder="请选择"
             >
@@ -133,8 +135,8 @@
 </template>
 
 <script>
-import {mapState} from 'vuex'
-import {checkSameDataSet} from '@/api/chart/chart'
+import { mapState } from 'vuex'
+import { checkSameDataSet } from '@/api/chart/chart'
 
 export default {
 
@@ -179,7 +181,6 @@ export default {
     ])
   },
   mounted() {
-    const _this = this
     // 初始化映射关系 如果当前是相同的数据集且没有关联关系，则自动补充映射关系
     checkSameDataSet(this.curLinkageView.propValue.viewId, this.element.propValue.viewId).then(res => {
       const chartDetails = JSON.parse(this.panelViewDetailsInfo[this.curLinkageView.propValue.viewId])
@@ -189,7 +190,7 @@ export default {
 
       if (res.data === 'YES' && this.linkageInfo.linkageFields.length === 0) {
         this.sourceLinkageInfo.targetViewFields.forEach(item => {
-          if (curCheckAllAxisStr.includes(item.id)&&targetCheckAllAxisStr.includes(item.id)) {
+          if (curCheckAllAxisStr.includes(item.id) && targetCheckAllAxisStr.includes(item.id)) {
             this.addLinkageField(item.id, item.id)
           }
         })

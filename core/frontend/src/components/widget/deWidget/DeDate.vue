@@ -1,25 +1,67 @@
 <template>
-  <el-date-picker
-    v-if="element.options!== null && element.options.attrs!==null && show"
-    ref="dateRef"
-    v-model="values"
-    :popper-class="'coustom-date-picker' + ' ' + extPoperClass"
-    :type="componentType"
-    :range-separator="$t(element.options.attrs.rangeSeparator)"
-    :start-placeholder="$t(element.options.attrs.startPlaceholder)"
-    :end-placeholder="$t(element.options.attrs.endPlaceholder)"
-    :placeholder="$t(element.options.attrs.placeholder)"
-    :append-to-body="inScreen"
-    value-format="timestamp"
-    :format="labelFormat"
-    :size="size"
-    :editable="false"
-    :picker-options="pickerOptions"
-    :default-time="defaultRangeTime"
-    @change="dateChange"
-    @focus="toFocus"
-    @blur="onBlur"
-  />
+  <div class="date-picker-vant">
+    <el-date-picker
+      v-if="element.options!== null && element.options.attrs!==null && show"
+      ref="dateRef"
+      v-model="values"
+      :popper-class="'coustom-date-picker' + ' ' + extPoperClass"
+      :class="{'show-required-tips': showRequiredTips}"
+      :type="componentType"
+      :range-separator="$t(element.options.attrs.rangeSeparator)"
+      :start-placeholder="showRequiredTips ? $t('panel.required_tips') : $t(element.options.attrs.startPlaceholder)"
+      :end-placeholder="showRequiredTips ? $t('panel.required_tips') : $t(element.options.attrs.endPlaceholder)"
+      :placeholder="showRequiredTips ? $t('panel.required_tips') : $t(element.options.attrs.placeholder)"
+      :append-to-body="inScreen"
+      value-format="timestamp"
+      :format="labelFormat"
+      :size="size"
+      :editable="false"
+      :picker-options="pickerOptions"
+      :default-time="defaultRangeTime"
+      @change="dateChange"
+      @focus="toFocus"
+      @blur="onBlur"
+    />
+    <div
+      v-if="isMobileStatus"
+      class="vant-mobile"
+      :class="isRange && 'wl50'"
+      @click="showPopup"
+    />
+    <div
+      v-if="isMobileStatus && isRange"
+      class="vant-mobile"
+      :class="['datetimerange', 'datetime', 'daterange'].includes(componentType) && 'wr50'"
+      @click="showPopupRight"
+    />
+    <van-popup
+      v-if="isMobileStatus"
+      v-model="showDate"
+      get-container="body"
+      position="bottom"
+      style="height: auto"
+    >
+      <van-datetime-picker
+        v-if="showdDatetimePicker"
+        v-model="currentDate"
+        :type="componentTypeVant"
+        title="选择时间"
+        :min-date="minDate"
+        :max-date="maxDate"
+        @confirm="confirm"
+        @cancel="cancel"
+      />
+      <van-picker
+        v-else
+        title="选择时间"
+        :default-index="defaultIndex"
+        show-toolbar
+        :columns="columns"
+        @confirm="onConfirm"
+        @cancel="onCancel"
+      />
+    </van-popup>
+  </div>
 </template>
 
 <script>
@@ -27,8 +69,16 @@ import { ApplicationContext } from '@/utils/ApplicationContext'
 import { timeSection } from '@/utils'
 import bus from '@/utils/bus'
 import customInput from '@/components/widget/deWidget/customInput'
+import { dateMap, years, seconds } from '@/components/widget/deWidget/serviceNameFn'
 import { mapState } from 'vuex'
+import vanPopup from 'vant/lib/popup'
+import vanDatetimePicker from 'vant/lib/datetime-picker'
+import vanPicker from 'vant/lib/picker'
+import 'vant/lib/popup/style'
+import 'vant/lib/datetime-picker/style'
+import 'vant/lib/picker/style'
 export default {
+  components: { vanPopup, vanDatetimePicker, vanPicker },
   mixins: [customInput],
   props: {
     canvasId: {
@@ -52,19 +102,60 @@ export default {
     isRelation: {
       type: Boolean,
       default: false
+    },
+    terminal: {
+      type: String,
+      default: 'pc'
     }
   },
   data() {
     return {
+      showDate: false,
+      minDate: new Date(1980, 0, 1),
+      maxDate: new Date(2025, 10, 1),
+      currentDate: new Date(),
       operator: 'between',
+      defaultIndex: 2,
+      columns: years,
       values: null,
       onFocus: false,
       show: true,
+      selectSecondInput: false,
+      selectSecond: false,
       outTimer: null,
       innerTimer: null
     }
   },
   computed: {
+    isMobileStatus() {
+      return this.mobileStatus || this.terminal === 'mobile'
+    },
+    isRange() {
+      if (!this.isMobileStatus) return false
+      return ['datetimerange', 'daterange'].includes(this.componentType)
+    },
+    showdDatetimePicker() {
+      if (!this.isMobileStatus) return false
+      if (this.showSecond && this.selectSecond) return false
+      return this.componentTypeVant !== 'year'
+    },
+    showSecond() {
+      if (!this.isMobileStatus) return false
+      return this.labelFormat?.endsWith('ss')
+    },
+    componentTypeVant() {
+      if (!this.isMobileStatus) return ''
+      if (this.showSecond) {
+        return 'datetime'
+      }
+      if (this.labelFormat?.endsWith('mm')) {
+        return 'datetime'
+      }
+      if (this.labelFormat?.endsWith('HH')) {
+        return 'datehour'
+      }
+      return dateMap[this.componentType]
+    },
     extPoperClass() {
       if (this.labelFormat && this.labelFormat.includes('HH') && !this.labelFormat.includes('HH:mm')) {
         return 'de-no-minite'
@@ -129,13 +220,21 @@ export default {
       }
       return null
     },
+    showRequiredTips() {
+      return this.inDraw && this.element.options.attrs.required && (!this.values || this.values.length === 0)
+    },
     ...mapState([
-      'canvasStyleData'
+      'canvasStyleData',
+      'mobileStatus'
     ])
 
   },
   watch: {
-
+    'values': function(val, old) {
+      if (!this.inDraw) {
+        this.$emit('widget-value-changed', val)
+      }
+    },
     'viewIds': function(value, old) {
       if (typeof value === 'undefined' || value === old) return
       this.setCondition()
@@ -186,6 +285,87 @@ export default {
     bus.$off('reset-default-value', this.resetDefaultValue)
   },
   methods: {
+    showPopupRight() {
+      // eslint-disable-next-line
+      const [_, end] = this.values || []
+      !!end && (this.currentDate = new Date(end))
+      this.selectSecondInput = true
+      this.showDate = true
+    },
+    cancel() {
+      this.showDate = false
+    },
+    confirm() {
+      this.setArrValue()
+      if (this.showSecond) {
+        this.columns = seconds
+        this.selectSecond = true
+      }
+      if (this.selectSecond || this.componentTypeVant === 'year') {
+        return
+      }
+      this.showDate = false
+      this.mobileDateChange()
+    },
+    onCancel() {
+      this.showDate = false
+      if (this.showSecond) {
+        this.selectSecond = false
+      }
+    },
+    setArrValue(val) {
+      if (!this.isRange) {
+        if (this.selectSecond) {
+          this.values = this.values + val * 1000
+          return
+        }
+        this.values = val ? +new Date(val) : +new Date(this.currentDate)
+        return
+      }
+      const [start, end] = this.values || []
+      if (this.selectSecond) {
+        if (this.selectSecondInput) {
+          this.values = [start, +new Date(this.currentDate) + val * 1000]
+        } else {
+          this.values = [+new Date(this.currentDate) + val * 1000, end]
+        }
+        return
+      }
+      if (this.selectSecondInput) {
+        this.values = [start, +new Date(this.currentDate)]
+      } else {
+        this.values = [+new Date(this.currentDate), end]
+      }
+    },
+    onConfirm(val) {
+      this.showDate = false
+      this.setArrValue(val)
+      if (this.showSecond) {
+        this.columns = years
+        this.selectSecond = false
+      }
+      this.mobileDateChange()
+    },
+    mobileDateChange() {
+      if (this.isRange) {
+        const [start, end] = this.values || []
+        if (!start || !end) return
+      }
+      this.dateChange(this.values)
+    },
+    showPopup() {
+      if (this.isRange) {
+        const [start] = this.values || []
+        !!start && (this.currentDate = new Date(start))
+      } else {
+        this.currentDate = new Date(this.values)
+        if (this.componentTypeVant === 'year') {
+          this.defaultIndex = years.findIndex(ele => `${this.currentDate.getFullYear()}` === ele)
+        }
+      }
+      this.selectSecondInput = false
+      this.showDate = true
+    },
     loadInit() {
       this.clearTime()
       if (this.refreshHandler()) {
@@ -242,8 +422,19 @@ export default {
         this.$refs.dateRef.hidePicker()
       }
     },
-    resetDefaultValue(id) {
-      if (this.inDraw && this.manualModify && this.element.id === id) {
+    textSame(str1, str2) {
+      if (str1 === null && str2 === null) {
+        return true
+      }
+      if (str1 !== null && str2 !== null && typeof str1 !== 'undefined' && typeof str2 !== 'undefined') {
+        return str1.toString() === str2.toString()
+      }
+      return false
+    },
+    resetDefaultValue(ele) {
+      const id = ele.id
+      const eleVal = ele.options.value.toString()
+      if (this.inDraw && this.manualModify && this.element.id === id && !this.textSame(this.values, eleVal) && this.textSame(this.defaultValueStr, eleVal)) {
         if (!this.element.options.attrs.default.isDynamic) {
           this.values = this.fillValueDerfault()
           this.dateChange(this.values)
@@ -277,6 +468,9 @@ export default {
       return param
     },
     setCondition() {
+      if (this.showRequiredTips) {
+        return
+      }
       const param = this.getCondition()
       !this.isRelation && this.inDraw && this.$store.commit('addViewFilter', param)
     },
@@ -290,6 +484,12 @@ export default {
         this.element.options.manualModify = false
       } else {
         this.element.options.manualModify = true
+        if (!this.showRequiredTips) {
+          this.$store.commit('setLastValidFilters', {
+            componentId: this.element.id,
+            val: (this.values && Array.isArray(this.values)) ? this.values.join(',') : this.values
+          })
+        }
       }
       this.setCondition()
     },
@@ -319,7 +519,16 @@ export default {
       }
     },
     fillValueDerfault() {
-      const defaultV = this.element.options.value === null ? '' : this.element.options.value.toString()
+      let defaultV = this.element.options.value === null ? '' : this.element.options.value.toString()
+      if (this.inDraw) {
+        let lastFilters = null
+        if (this.$store.state.lastValidFilters) {
+          lastFilters = this.$store.state.lastValidFilters[this.element.id]
+          if (lastFilters) {
+            defaultV = (lastFilters.val === null || typeof lastFilters.val === 'undefined') ? '' : lastFilters.val.toString()
+          }
+        }
+      }
       if (this.element.options.attrs.type === 'daterange') {
         if (defaultV === null || typeof defaultV === 'undefined' || defaultV === '' || defaultV ===
           '[object Object]') {
@@ -338,9 +547,56 @@ export default {
 }
 
 </script>
+<style lang="scss" scoped>
+.show-required-tips {
+  border-color: #ff0000 !important;
+  ::v-deep .el-input__inner {
+    color: #ff0000 !important;
+  }
+  ::v-deep input::placeholder {
+    color: #ff0000 !important;
+  }
+  ::v-deep i {
+    color: #ff0000 !important;
+  }
+}
+.show-required-tips ::v-deep .el-input__inner, input {
+  border-color: #ff0000 !important;
+}
 
+.show-required-tips ::v-deep .el-input__inner, input::placeholder {
+  color: #ff0000 !important;
+}
+.show-required-tips ::v-deep i {
+  color: #ff0000 !important;
+}
+
+</style>
 <style lang="scss">
+.date-picker-vant {
+  position: relative;
+  width: 100%;
+  .el-date-editor {
+    width: 100% !important;
+  }
+  .vant-mobile {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    &.wl50 {
+      width: 50%;
+    }
+    &.wr50 {
+      left: auto;
+      right: 0;
+      width: 50%;
+    }
+  }
+}
 .coustom-date-picker {
+  right: 0px;
   border: 1px solid var(--BrDateColor, #dfe4ed) !important;
   background: var(--BgDateColor, #FFFFFF) !important;
 

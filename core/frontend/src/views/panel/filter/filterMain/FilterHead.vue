@@ -1,6 +1,8 @@
 <template>
   <el-row>
-    <el-col :span="24">
+    <el-col
+      class="filter-field-container"
+    >
       <div class="filter-field">
         <div class="field-content">
 
@@ -13,7 +15,7 @@
                 animation="300"
                 :move="onMove"
                 class="row wrap justify-space-around theme-drag"
-                style="width:100%;height: 100%;margin:0 10px;border-radius: 4px;overflow-x: auto;display: flex;align-items: center;"
+                style="width:calc(100% - 25px);height: 100%;margin:0 10px;border-radius: 4px;overflow-x: auto;display: flex;align-items: center;"
                 @end="end2"
               >
 
@@ -31,11 +33,26 @@
                   />
                 </v-flex>
 
-                <span solt="footer">{{ $t('panel.drag_here') }}</span>
+                <span slot="footer">{{ $t('panel.drag_here') }}</span>
+                <i
+                  v-show="element.options.attrs.dragItems.length"
+                  class="el-icon-error clr-btn"
+                  @click="clearItems"
+                />
               </draggable>
             </el-row>
           </div>
         </div>
+      </div>
+    </el-col>
+    <el-col
+      class="filter-required-container"
+    >
+      <div class="de-filter-required">
+        <el-checkbox
+          v-model="element.options.attrs.required"
+          @change="requiredChange"
+        >{{ $t('commons.required') }}</el-checkbox>
       </div>
     </el-col>
   </el-row>
@@ -71,10 +88,12 @@ export default {
 
   },
   methods: {
+    requiredChange(val) {
+      this.$emit('required-change', val)
+    },
     getTableName(tableId) {
       let tableName = null
       this.$emit('dataset-name', tableId, t => { tableName = t })
-      console.log(tableName)
       return tableName
     },
     onMove(e, originalEvent) {
@@ -82,7 +101,10 @@ export default {
     },
     end2(e) {
     },
-
+    clearItems() {
+      this.element.options.attrs.dragItems.splice(0)
+      this.element.options.attrs.sort = null
+    },
     closeItem(tag) {
       const index = tag.index
       this.element.options.attrs.dragItems.splice(index, 1)
@@ -95,13 +117,26 @@ export default {
 
 </script>
 <style lang="scss" scoped>
+.filter-field-container {
+  width: calc(100% - 70px);
+  float: left;
+}
+.filter-required-container {
+  width: 70px;
+  float: right;
+}
+.de-filter-required {
+  height: 40px;
+  line-height: 40px;
+  float: right;
+}
 .filter-field {
   border-radius: 4px;
   height: 40px;
   overflow-x: overlay;
   .field-content {
     position: relative;
-    display: table;
+    // display: table;
     width: 100%;
     height: 100%;
     white-space: nowrap;
@@ -164,5 +199,12 @@ export default {
 .blackTheme .theme-drag {
   background-color: var(--MainBG, #fff);
 }
-
+.clr-btn {
+  cursor: pointer;
+  position: absolute;
+  right: 10px;
+  &:hover {
+    color: #3370ff;
+  }
+}
 </style>

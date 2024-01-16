@@ -71,7 +71,10 @@
                     popper-class="api-table-delete"
                     trigger="click"
                   >
-                    <svg-icon :disabled="disabled" icon-class="icon_info_filled" />
+                    <svg-icon
+                      :disabled="disabled"
+                      icon-class="icon_info_filled"
+                    />
                     <div class="tips">
                       {{ $t('datasource.delete_this_item') }}
                     </div>
@@ -522,6 +525,20 @@
             </el-input>
           </el-form-item>
 
+          <el-form-item
+            :label="$t('datasource.query_timeout')"
+            prop="apiQueryTimeout"
+          >
+            <el-input
+              v-model="apiItem.apiQueryTimeout"
+              autocomplete="off"
+              type="number"
+              :min="0"
+            >
+              <template slot="append">{{ $t('panel.second') }}</template>
+            </el-input>
+          </el-form-item>
+
           <div v-loading="loading">
             <div class="row-rules mr40">
               <span>{{ $t('datasource.req_param') }}</span>
@@ -541,8 +558,8 @@
             :label="$t('datasource.isUseJsonPath')"
           >
             <el-input
-              :disabled="!apiItem.useJsonPath"
               v-model="apiItem.jsonPath"
+              :disabled="!apiItem.useJsonPath"
               :placeholder="$t('datasource.jsonpath_info')"
               class="input-with-select"
               size="small"
@@ -562,18 +579,24 @@
               </el-select>
 
               <el-button
-                :disabled="!apiItem.useJsonPath"
                 slot="append"
+                :disabled="!apiItem.useJsonPath"
                 @click="showApiData"
               >{{ $t('datasource.show_api_data') }}
               </el-button>
             </el-input>
           </el-form-item>
 
-          <div class="row-rules" v-show="apiItem.useJsonPath">
+          <div
+            v-show="apiItem.useJsonPath"
+            class="row-rules"
+          >
             <span>{{ $t('datasource.column_info') }}</span>
           </div>
-          <div class="table-container de-svg-in-table" v-show="apiItem.useJsonPath">
+          <div
+            v-show="apiItem.useJsonPath"
+            class="table-container de-svg-in-table"
+          >
             <el-table
               ref="apiItemTable"
               :data="originFieldItem.jsonFields"
@@ -832,7 +855,7 @@ export default {
             acquireIncrement: 5,
             idleConnectionTestPeriod: 5,
             connectTimeout: 5,
-            queryTimeout: 30
+            apiQueryTimeout: 30
           },
           apiConfiguration: []
         }
@@ -972,6 +995,13 @@ export default {
             trigger: 'blur'
           }
         ],
+        'apiQueryTimeout': [
+          {
+            required: true,
+            validator: this.isNumber,
+            trigger: ['blur', 'change']
+          }
+        ],
         dataPath: [
           {
             required: true,
@@ -992,6 +1022,7 @@ export default {
         name: '',
         url: '',
         method: 'GET',
+        apiQueryTimeout: 30,
         request: {
           headers: [{}],
           arguments: [],
@@ -1009,6 +1040,7 @@ export default {
         url: '',
         method: 'GET',
         dataPath: '',
+        apiQueryTimeout: 30,
         request: {
           headers: [],
           arguments: [],
@@ -1085,7 +1117,7 @@ export default {
       originFieldItem: {
         jsonFields: [],
         fields: []
-      },
+      }
     }
   },
   methods: {
@@ -1126,6 +1158,24 @@ export default {
       }
       callback()
     },
+    isNumber(rule, value, callback) {
+      if (!value) {
+        callback(new Error(i18n.t('datasource.please_input_query_timeout')))
+        return
+      }
+      let isNumber = false
+      var reg = /^\d+$/
+      isNumber = reg.test(value)
+      if (!isNumber) {
+        callback(new Error(i18n.t('datasource.please_input_query_timeout')))
+        return
+      }
+      if (value <= 0 || value > 300) {
+        callback(new Error(i18n.t('datasource.please_input_query_timeout')))
+        return
+      }
+      callback()
+    },
     next() {
       if (this.active === 1) {
         let hasRepeatName = false
@@ -1151,7 +1201,7 @@ export default {
             const data = Base64.encode(JSON.stringify(this.apiItem))
             this.loading = true
             this.disabledNext = true
-            checkApiDatasource({'data': data})
+            checkApiDatasource({ 'data': data })
               .then((res) => {
                 this.loading = false
                 this.disabledNext = false
@@ -1174,16 +1224,16 @@ export default {
         })
       }
     },
-    showApiData(){
+    showApiData() {
       this.$refs.apiItemBasicInfo.validate((valid) => {
         if (valid) {
           const data = Base64.encode(JSON.stringify(this.apiItem))
           this.loading = true
-          checkApiDatasource({'data': data, 'type': 'apiStructure'})
+          checkApiDatasource({ 'data': data, 'type': 'apiStructure' })
             .then((res) => {
-              res.data.jsonFields.forEach(((item) => {
+              res.data.jsonFields.forEach((item) => {
                 item.checked = false
-              }))
+              })
               this.originFieldItem.jsonFields = res.data.jsonFields
               this.loading = false
               this.$success(i18n.t('commons.success'))
@@ -1227,10 +1277,10 @@ export default {
         for (let i = 0; i < this.form.apiConfiguration.length; i++) {
           if (this.form.apiConfiguration[i].serialNumber === this.apiItem.serialNumber) {
             this.certinKey = !this.certinKey
-            if(this.form.apiConfiguration[i].name !== this.apiItem.name){
+            if (this.form.apiConfiguration[i].name !== this.apiItem.name) {
               this.apiItem.reName = true
               this.apiItem.orgName = this.form.apiConfiguration[i].name
-            }else {
+            } else {
               this.apiItem.reName = false
             }
             this.form.apiConfiguration[i] = JSON.parse(JSON.stringify(this.apiItem))
@@ -1401,7 +1451,7 @@ export default {
     min-width: 48px !important;
   }
   .tips {
-    font-family: PingFang SC;
+    font-family: AlibabaPuHuiTi;
     font-size: 14px;
     font-weight: 500;
     line-height: 22px;
@@ -1420,7 +1470,7 @@ export default {
   }
 }
 .de-expand {
-  font-family: PingFang SC;
+  font-family: AlibabaPuHuiTi;
   font-size: 14px;
   font-weight: 400;
   line-height: 22px;
@@ -1436,7 +1486,7 @@ export default {
   .el-drawer__header {
     padding: 16px 24px;
     margin: 0;
-    font-family: PingFang SC;
+    font-family: AlibabaPuHuiTi;
     font-size: 16px;
     font-weight: 500;
     line-height: 24px;
@@ -1464,7 +1514,7 @@ export default {
     display: flex;
     align-items: center;
     position: relative;
-    font-family: PingFang SC;
+    font-family: AlibabaPuHuiTi;
     font-size: 14px;
     font-weight: 500;
     line-height: 22px;
@@ -1515,7 +1565,7 @@ export default {
     }
     .el-step__icon.is-text {
       border: none;
-      font-family: PingFang SC;
+      font-family: AlibabaPuHuiTi;
       font-weight: 400;
       color: #fff;
       width: 28px;
@@ -1528,7 +1578,7 @@ export default {
       }
     }
     .el-step__title {
-      font-family: PingFang SC;
+      font-family: AlibabaPuHuiTi;
       font-size: 14px;
       font-weight: 500;
       line-height: 22px;
@@ -1571,7 +1621,7 @@ export default {
   .btn {
     border-radius: 4px;
     padding: 5px 26px 5px 26px;
-    font-family: PingFang SC;
+    font-family: AlibabaPuHuiTi;
     font-size: 14px;
     font-weight: 400;
     line-height: 20px;
@@ -1647,7 +1697,7 @@ export default {
   border-radius: 4px;
   margin-bottom: 12px;
   padding: 20px 16px;
-  font-family: PingFang SC;
+  font-family: AlibabaPuHuiTi;
   .name {
     font-size: 16px;
     font-weight: 500;

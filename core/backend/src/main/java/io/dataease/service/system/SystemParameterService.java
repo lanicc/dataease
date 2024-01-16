@@ -1,18 +1,18 @@
 package io.dataease.service.system;
 
 import io.dataease.commons.constants.ParamConstants;
-import io.dataease.commons.exception.DEException;
+;
 import io.dataease.commons.utils.BeanUtils;
 import io.dataease.commons.utils.EncryptUtils;
 import io.dataease.controller.sys.response.BasicInfo;
 import io.dataease.dto.SystemParameterDTO;
-import io.dataease.exception.DataEaseException;
 import io.dataease.ext.ExtSystemParameterMapper;
 import io.dataease.plugins.common.base.domain.FileMetadata;
 import io.dataease.plugins.common.base.domain.SystemParameter;
 import io.dataease.plugins.common.base.domain.SystemParameterExample;
 import io.dataease.plugins.common.base.mapper.SystemParameterMapper;
-import io.dataease.plugins.config.SpringContextUtil;
+import io.dataease.plugins.common.exception.DataEaseException;
+import io.dataease.plugins.common.util.SpringContextUtil;
 import io.dataease.plugins.xpack.cas.dto.CasSaveResult;
 import io.dataease.plugins.xpack.cas.service.CasXpackService;
 import io.dataease.plugins.xpack.display.service.DisplayXpackService;
@@ -56,6 +56,7 @@ public class SystemParameterService {
         return extSystemParameterMapper.email();
     }
 
+
     public BasicInfo basicInfo() {
         List<SystemParameter> paramList = this.getParamList("basic");
         List<SystemParameter> homePageList = this.getParamList("ui.openHomePage");
@@ -80,6 +81,9 @@ public class SystemParameterService {
                 }
                 if (StringUtils.equals(param.getParamKey(), ParamConstants.BASIC.LOG_TIME_OUT.getValue())) {
                     result.setLogTimeOut(param.getParamValue());
+                }
+                if (StringUtils.equals(param.getParamKey(), ParamConstants.BASIC.DS_SYNC_LOG_TIME_OUT.getValue())) {
+                    result.setDsSyncLogTimeOut(param.getParamValue());
                 }
                 if (StringUtils.equals(param.getParamKey(), ParamConstants.BASIC.DEFAULT_LOGIN_TYPE.getValue())) {
                     String paramValue = param.getParamValue();
@@ -192,9 +196,9 @@ public class SystemParameterService {
     @Transactional
     public void resetCas() {
         Map<String, CasXpackService> beansOfType = SpringContextUtil.getApplicationContext().getBeansOfType((CasXpackService.class));
-        if (beansOfType.keySet().size() == 0) DEException.throwException("当前未启用CAS");
+        if (beansOfType.keySet().size() == 0) DataEaseException.throwException("当前未启用CAS");
         CasXpackService casXpackService = SpringContextUtil.getBean(CasXpackService.class);
-        if (ObjectUtils.isEmpty(casXpackService)) DEException.throwException("当前未启用CAS");
+        if (ObjectUtils.isEmpty(casXpackService)) DataEaseException.throwException("当前未启用CAS");
 
         String loginTypePk = "basic.loginType";
         SystemParameter loginTypeParameter = systemParameterMapper.selectByPrimaryKey(loginTypePk);
@@ -341,7 +345,7 @@ public class SystemParameterService {
                             // It's an image (only BMP, GIF, JPG and PNG are recognized).
                             ImageIO.read(input).toString();
                         } catch (Exception e) {
-                            DEException.throwException("Uploaded images do not meet the image format requirements");
+                            DataEaseException.throwException("Uploaded images do not meet the image format requirements");
                             return;
                         }
                     }
@@ -407,6 +411,29 @@ public class SystemParameterService {
 
     @CacheEvict("multiLogin")
     public void clearMultiLoginCache() {
+    }
+
+    public String onlineMapKey() {
+        return getValue("map.key");
+    }
+
+    public void saveMapKey(String key) {
+        String paramKey = "map.key";
+        SystemParameterExample example = new SystemParameterExample();
+        example.createCriteria().andParamKeyEqualTo(paramKey);
+        List<SystemParameter> systemParameters = systemParameterMapper.selectByExample(example);
+        if (CollectionUtils.isNotEmpty(systemParameters)) {
+            SystemParameter systemParameter = systemParameters.get(0);
+            systemParameter.setParamValue(key);
+            systemParameterMapper.updateByExample(systemParameter, example);
+            return;
+        }
+        SystemParameter record = new SystemParameter();
+        record.setParamKey(paramKey);
+        record.setParamValue(key);
+        record.setType("text");
+        record.setSort(1);
+        systemParameterMapper.insert(record);
     }
 
 }

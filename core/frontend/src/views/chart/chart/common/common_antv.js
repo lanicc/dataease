@@ -128,6 +128,9 @@ export function getLabel(chart) {
           }
           if (l.position === 'outer') {
             label.type = 'spider'
+            label.layout = [
+              { type: 'limit-in-plot' }
+            ]
           }
         } else if (chart.type.includes('line') || chart.type.includes('area')) {
           label = {
@@ -143,7 +146,7 @@ export function getLabel(chart) {
           }
         } else if (chart.type.includes('bar')) {
           label = {
-            layout: [{ type: 'limit-in-canvas' }],
+            layout: [{ type: 'limit-in-plot' }],
             position: l.position
           }
         } else {
@@ -158,8 +161,13 @@ export function getLabel(chart) {
         // label value formatter
         if (chart.type && chart.type !== 'waterfall') {
           label.formatter = function(param) {
-            let yAxis, extStack, xaxisExt
+            let xAxis, yAxis, extStack, xaxisExt
             let res = param.value
+            try {
+              xAxis = JSON.parse(chart.xaxis)
+            } catch (e) {
+              xAxis = JSON.parse(JSON.stringify(chart.xaxis))
+            }
             try {
               yAxis = JSON.parse(chart.yaxis)
             } catch (e) {
@@ -241,41 +249,52 @@ export function getLabel(chart) {
                 contentItems.push(valueFormatter(param.value, formatterCfg))
               }
               res = contentItems.join('\n')
+            } else if (chart.type === 'scatter' && xAxis && xAxis.length > 0 && xAxis[0].groupType === 'q') {
+              // 针对散点图
+              res = param.field
             } else {
               for (let i = 0; i < yAxis.length; i++) {
                 const f = yAxis[i]
-                if (f.name === param.category) {
-                  let formatterCfg = formatterItem
-                  if (f.formatterCfg) {
-                    formatterCfg = f.formatterCfg
-                  }
-                  // 饼图和环形图格式优化
-                  if (equalsAny(chart.type, 'pie', 'pie-donut')) {
-                    // 这边默认值取指标是为了兼容存量的视图
-                    const labelContent = l.labelContent ?? ['quota']
-                    const contentItems = []
-                    if (labelContent.includes('dimension')) {
-                      contentItems.push(param.field)
-                    }
-                    if (labelContent.includes('quota')) {
-                      contentItems.push(valueFormatter(param.value, formatterCfg))
-                    }
-                    if (labelContent.includes('proportion')) {
-                      const percentage = `${(Math.round(param.percent * 10000) / 100).toFixed(l.reserveDecimalCount)}%`
-                      if (labelContent.length === 3) {
-                        contentItems.push(`(${percentage})`)
-                      } else {
-                        contentItems.push(percentage)
-                      }
-                    }
-                    res = contentItems.join(' ')
-                  } else if (equalsAny(chart.type, 'pie-rose', 'pie-donut-rose')) {
-                    const quotaValue = valueFormatter(param.value, formatterCfg)
-                    res = [param.field, quotaValue].join(' ')
-                  } else {
+                let formatterCfg = formatterItem
+                if (f.formatterCfg) {
+                  formatterCfg = f.formatterCfg
+                }
+
+                if (chart.type === 'scatter' && xAxis && xAxis.length > 0 && xAxis[0].groupType === 'q') {
+                  // 针对横轴为指标的散点图
+                  if (f.name === param.group) {
                     res = valueFormatter(param.value, formatterCfg)
                   }
-                  break
+                } else {
+                  if (f.name === param.category) {
+                  // 饼图和环形图格式优化
+                    if (equalsAny(chart.type, 'pie', 'pie-donut')) {
+                    // 这边默认值取指标是为了兼容存量的视图
+                      const labelContent = l.labelContent ?? ['quota']
+                      const contentItems = []
+                      if (labelContent.includes('dimension')) {
+                        contentItems.push(param.field)
+                      }
+                      if (labelContent.includes('quota')) {
+                        contentItems.push(valueFormatter(param.value, formatterCfg))
+                      }
+                      if (labelContent.includes('proportion')) {
+                        const percentage = `${(Math.round(param.percent * 10000) / 100).toFixed(l.reserveDecimalCount)}%`
+                        if (labelContent.length === 3) {
+                          contentItems.push(`(${percentage})`)
+                        } else {
+                          contentItems.push(percentage)
+                        }
+                      }
+                      res = contentItems.join(' ')
+                    } else if (equalsAny(chart.type, 'pie-rose', 'pie-donut-rose')) {
+                      const quotaValue = valueFormatter(param.value, formatterCfg)
+                      res = [param.field, quotaValue].join(' ')
+                    } else {
+                      res = valueFormatter(param.value, formatterCfg)
+                    }
+                    break
+                  }
                 }
               }
             }
@@ -300,21 +319,36 @@ export function getTooltip(chart) {
       const t = JSON.parse(JSON.stringify(customAttr.tooltip))
       if (t.show) {
         tooltip = {}
+        let xAxis, yAxis, extStack, xAxisExt
+
+        try {
+          xAxis = JSON.parse(chart.xaxis)
+        } catch (e) {
+          xAxis = JSON.parse(JSON.stringify(chart.xaxis))
+        }
+        try {
+          xAxisExt = JSON.parse(chart.xaxisExt)
+        } catch (e) {
+          xAxisExt = JSON.parse(JSON.stringify(chart.xaxisExt))
+        }
+        try {
+          yAxis = JSON.parse(chart.yaxis)
+        } catch (e) {
+          yAxis = JSON.parse(JSON.stringify(chart.yaxis))
+        }
+        try {
+          extStack = JSON.parse(chart.extStack)
+        } catch (e) {
+          extStack = JSON.parse(JSON.stringify(chart.extStack))
+        }
+
         // tooltip value formatter
         if (chart.type && chart.type !== 'waterfall') {
+          if (chart.type === 'bar-group-stack') {
+            tooltip.fields = []
+          }
           tooltip.formatter = function(param) {
-            let yAxis, extStack
             let res = param.value
-            try {
-              yAxis = JSON.parse(chart.yaxis)
-            } catch (e) {
-              yAxis = JSON.parse(JSON.stringify(chart.yaxis))
-            }
-            try {
-              extStack = JSON.parse(chart.extStack)
-            } catch (e) {
-              extStack = JSON.parse(JSON.stringify(chart.extStack))
-            }
 
             let obj
             if (equalsAny(chart.type, 'bar-stack', 'line-stack',
@@ -391,7 +425,7 @@ export function getTooltip(chart) {
                   res = valueFormatter(param.value, formatterItem)
                 }
               }
-            } else if (includesAny(chart.type, 'bar', 'scatter', 'radar', 'area') && !chart.type.includes('group')) {
+            } else if (includesAny(chart.type, 'bar', 'scatter', 'radar', 'area') && !chart.type.includes('group') && chart.type !== 'bar-time-range') {
               obj = { name: param.category, value: param.value }
               for (let i = 0; i < yAxis.length; i++) {
                 const f = yAxis[i]
@@ -424,7 +458,7 @@ export function getTooltip(chart) {
               } else {
                 let name = ''
                 if (param.group) {
-                  name = param.name + '-'
+                  name = param.group + '-'
                 }
                 if (param.category) {
                   name += param.category
@@ -439,11 +473,69 @@ export function getTooltip(chart) {
                   res = valueFormatter(param.value, formatterItem)
                 }
               }
+            } else if (chart.type === 'bar-time-range') {
+              obj = { values: param.values, name: param.category }
+              res = param.values[0] + ' - ' + param.values[1]
             } else {
               res = param.value
             }
             obj.value = res === null ? '' : res
             return obj
+          }
+          //
+          if (chart.type === 'scatter' && xAxis && xAxis.length > 0 && xAxis[0].groupType === 'q') {
+            tooltip.fields = ['x', 'category', 'value', 'group', 'field']
+            tooltip.customContent = (title, data) => {
+              const key1 = xAxis[0]?.name
+              let key2, v1, v2, subGroup
+
+              let hasSubGroup = false
+
+              if (data && data.length > 0) {
+                title = data[0].data.category
+                key2 = data[0].data.group
+                subGroup = data[0].data.field
+                hasSubGroup = xAxisExt.length > 0
+
+                const fx = xAxis[0]
+                if (fx.formatterCfg) {
+                  v1 = valueFormatter(data[0].data.x, fx.formatterCfg)
+                } else {
+                  v1 = valueFormatter(data[0].data.x, formatterItem)
+                }
+
+                for (let i = 0; i < yAxis.length; i++) {
+                  const f = yAxis[i]
+                  if (f.name === key2) {
+                    if (f.formatterCfg) {
+                      v2 = valueFormatter(data[0].data.value, f.formatterCfg)
+                    } else {
+                      v2 = valueFormatter(data[0].data.value, formatterItem)
+                    }
+                    break
+                  }
+                }
+              }
+
+              return `
+                     <div>
+                       <div class="g2-tooltip-title">${title}</div>
+                       ` +
+                      (hasSubGroup
+                        ? `<div class="g2-tooltip-item">
+                                <span class="g2-tooltip-name">${xAxisExt[0].name}:</span><span class="g2-tooltip-value">${subGroup}</span>
+                            </div>` : ``) +
+                    `
+                       <div class="g2-tooltip-item">
+                           <span class="g2-tooltip-name">${key1}:</span><span class="g2-tooltip-value">${v1}</span>
+                       </div>
+                       <div class="g2-tooltip-item">
+                           <span class="g2-tooltip-name">${key2}:</span><span class="g2-tooltip-value">${v2}</span>
+                       </div>
+                       <div class="g2-tooltip-item">&nbsp;</div>
+                     </div>
+                    `
+            }
           }
         }
       } else {
@@ -573,11 +665,16 @@ export function getXAxis(chart) {
           },
           spacing: 8
         } : null
+        const gridCfg = a.splitLine ? a.splitLine : DEFAULT_XAXIS_STYLE.splitLine
+        if (!gridCfg.dashStyle) {
+          gridCfg.dashStyle = DEFAULT_XAXIS_STYLE.splitLine.dashStyle
+        }
         const grid = a.splitLine.show ? {
           line: {
             style: {
               stroke: a.splitLine.lineStyle.color,
-              lineWidth: parseInt(a.splitLine.lineStyle.width)
+              lineWidth: parseInt(a.splitLine.lineStyle.width),
+              lineDash: gridCfg.enableDash ? [gridCfg.dashStyle.width, gridCfg.dashStyle.offset] : undefined
             }
           }
         } : null
@@ -614,8 +711,23 @@ export function getXAxis(chart) {
           }
         } : null
 
+        const position = transAxisPosition(chart, a)
+
+        if (a.axisLabel.show && chart.type === 'bidirectional-bar') {
+          label.rotate = 0
+          label.style.textAlign = 'start'
+        }
+        if (a.axisLabel.show && chart.type === 'bar-time-range') {
+          label.rotate = 0
+          if (position === 'top') {
+            label.style.textAlign = 'start'
+          } else {
+            label.style.textAlign = 'end'
+          }
+        }
+
         axis = {
-          position: transAxisPosition(chart, a),
+          position: position,
           title: title,
           grid: grid,
           label: label,
@@ -628,7 +740,7 @@ export function getXAxis(chart) {
         delete axis.maxLimit
         delete axis.tickCount
         const axisValue = a.axisValue
-        if (chart.type.includes('horizontal')) {
+        if (chart.type.includes('horizontal') || chart.type === 'bar-time-range') {
           if (axisValue && !axisValue.auto) {
             const yAxisSeriesMaxList = []
             const maxList = []
@@ -683,11 +795,16 @@ export function getYAxis(chart) {
           },
           spacing: 8
         } : null
+        const gridCfg = a.splitLine ? a.splitLine : DEFAULT_YAXIS_STYLE.splitLine
+        if (!gridCfg.dashStyle) {
+          gridCfg.dashStyle = DEFAULT_YAXIS_STYLE.splitLine.dashStyle
+        }
         const grid = a.splitLine.show ? {
           line: {
             style: {
               stroke: a.splitLine.lineStyle.color,
-              lineWidth: parseInt(a.splitLine.lineStyle.width)
+              lineWidth: parseInt(a.splitLine.lineStyle.width),
+              lineDash: gridCfg.enableDash ? [gridCfg.dashStyle.width, gridCfg.dashStyle.offset] : undefined
             }
           }
         } : null
@@ -713,7 +830,7 @@ export function getYAxis(chart) {
             if (chart.type === 'waterfall') {
               return value
             } else {
-              if (!chart.type.includes('horizontal')) {
+              if (!(chart.type.includes('horizontal') || chart.type === 'bar-time-range')) {
                 if (!a.axisLabelFormatter) {
                   return valueFormatter(value, formatterItem)
                 } else {
@@ -740,7 +857,7 @@ export function getYAxis(chart) {
         delete axis.maxLimit
         delete axis.tickCount
         const axisValue = a.axisValue
-        if (!chart.type.includes('horizontal')) {
+        if (!chart.type.includes('horizontal') || chart.type === 'bar-time-range') {
           if (axisValue && !axisValue.auto) {
             const yAxisSeriesMaxList = []
             const maxList = []
@@ -795,11 +912,16 @@ export function getYAxisExt(chart) {
           },
           spacing: 8
         } : null
+        const gridCfg = a.splitLine ? a.splitLine : DEFAULT_YAXIS_EXT_STYLE.splitLine
+        if (!gridCfg.dashStyle) {
+          gridCfg.dashStyle = DEFAULT_YAXIS_EXT_STYLE.splitLine.dashStyle
+        }
         const grid = a.splitLine.show ? {
           line: {
             style: {
               stroke: a.splitLine.lineStyle.color,
-              lineWidth: parseInt(a.splitLine.lineStyle.width)
+              lineWidth: parseInt(a.splitLine.lineStyle.width),
+              lineDash: gridCfg.enableDash ? [gridCfg.dashStyle.width, gridCfg.dashStyle.offset] : undefined
             }
           }
         } : null
@@ -931,7 +1053,7 @@ export function getSlider(chart) {
 export function getAnalyse(chart) {
   let senior = {}
   const assistLine = []
-  if (chart.senior && chart.type && (chart.type.includes('bar') || chart.type.includes('line') || chart.type.includes('mix') || chart.type.includes('area'))) {
+  if (chart.senior && chart.type && (chart.type.includes('bar') || chart.type.includes('line') || chart.type.includes('mix') || chart.type.includes('area') || chart.type.includes('scatter'))) {
     senior = JSON.parse(chart.senior)
     if (senior.assistLine && senior.assistLine.length > 0) {
       const customStyle = JSON.parse(chart.customStyle)
@@ -952,48 +1074,50 @@ export function getAnalyse(chart) {
       }
 
       const fixedLines = senior.assistLine.filter(ele => ele.field === '0')
-      const dynamicLines = chart.data.dynamicAssistLines
+      const dynamicLines = chart.data.dynamicAssistData
       const lines = fixedLines.concat(dynamicLines)
 
       lines.forEach(ele => {
-        const value = parseFloat(ele.value)
-        const content = ele.name + ' : ' + valueFormatter(value, axisFormatterCfg)
-        assistLine.push({
-          type: 'line',
-          start: ['start', value],
-          end: ['end', value],
-          style: {
-            stroke: ele.color,
-            lineDash: getLineDash(ele.lineType)
+        if (ele) {
+          const value = parseFloat(ele.value)
+          const content = ele.name + ' : ' + valueFormatter(value, axisFormatterCfg)
+          assistLine.push({
+            type: 'line',
+            start: ['start', value],
+            end: ['end', value],
+            style: {
+              stroke: ele.color,
+              lineDash: getLineDash(ele.lineType)
+            }
+          })
+          if (!chart.type.includes('horizontal')) {
+            assistLine.push({
+              type: 'text',
+              position: [yAxisPosition === 'left' ? 'start' : 'end', value],
+              content: content,
+              offsetY: -2,
+              offsetX: yAxisPosition === 'left' ? 2 : -10 * (content.length - 2),
+              style: {
+                textBaseline: 'bottom',
+                fill: ele.color,
+                fontSize: ele.fontSize ? parseInt(ele.fontSize) : 10
+              }
+            })
+          } else {
+            assistLine.push({
+              type: 'text',
+              position: [xAxisPosition === 'left' ? 'start' : 'end', value],
+              content: content,
+              offsetY: xAxisPosition === 'left' ? -2 : -10 * (content.length - 2),
+              offsetX: 2,
+              rotate: Math.PI / 2,
+              style: {
+                textBaseline: 'bottom',
+                fill: ele.color,
+                fontSize: ele.fontSize ? parseInt(ele.fontSize) : 10
+              }
+            })
           }
-        })
-        if (!chart.type.includes('horizontal')) {
-          assistLine.push({
-            type: 'text',
-            position: [yAxisPosition === 'left' ? 'start' : 'end', value],
-            content: content,
-            offsetY: -2,
-            offsetX: yAxisPosition === 'left' ? 2 : -10 * (content.length - 2),
-            style: {
-              textBaseline: 'bottom',
-              fill: ele.color,
-              fontSize: ele.fontSize ? parseInt(ele.fontSize) : 10
-            }
-          })
-        } else {
-          assistLine.push({
-            type: 'text',
-            position: [xAxisPosition === 'left' ? 'start' : 'end', value],
-            content: content,
-            offsetY: xAxisPosition === 'left' ? -2 : -10 * (content.length - 2),
-            offsetX: 2,
-            rotate: Math.PI / 2,
-            style: {
-              textBaseline: 'bottom',
-              fill: ele.color,
-              fontSize: ele.fontSize ? parseInt(ele.fontSize) : 10
-            }
-          })
         }
       })
     }

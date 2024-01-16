@@ -57,7 +57,7 @@ const routeBefore = (callBack) => {
     callBack()
   }
 }
-router.beforeEach(async (to, from, next) => routeBefore(() => {
+router.beforeEach(async(to, from, next) => routeBefore(() => {
   // start progress bar
   NProgress.start()
   const mobileIgnores = ['/delink', '/de-auto-login']
@@ -92,6 +92,7 @@ router.beforeEach(async (to, from, next) => routeBefore(() => {
       const hasGetUserInfo = store.getters.name
       if (hasGetUserInfo || to.path.indexOf('/previewScreenShot/') > -1 || to.path.indexOf('/preview/') > -1 || to.path.indexOf('/delink') > -1 || to.path.indexOf('/nolic') > -1) {
         next()
+        if (to.path.indexOf('/task-ds-form') > -1) return
         store.dispatch('permission/setCurrentPath', to.path)
         let route = store.getters.permission_routes.find(
           item => item.path === '/' + to.path.split('/')[1]
@@ -141,7 +142,7 @@ router.beforeEach(async (to, from, next) => routeBefore(() => {
       next()
     } else {
       // other pages that do not have permission to access are redirected to the login page.
-      next(`/login?redirect=${to.fullPath}`)
+      next(`/login?redirect=${encodeURIComponent(to.fullPath)}`)
       NProgress.done()
     }
   }

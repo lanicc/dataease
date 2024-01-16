@@ -218,7 +218,7 @@
           <el-collapse-item
             v-show="showPropertiesCollapse(['split-selector', 'split-selector-ant-v'])"
             name="split"
-            :title="$t('chart.split')"
+            :title="$t('chart.axis')"
           >
             <split-selector
               v-if="showProperties('split-selector')"
@@ -471,13 +471,13 @@ export default {
       return false
     },
     xAisTitle() {
-      if (this.chart.type === 'bidirectional-bar') {
+      if (this.chart.type === 'bidirectional-bar' || this.chart.type === 'bar-time-range') {
         return this.$t('chart.yAxis')
       }
       return this.$t('chart.xAxis')
     },
     yAxisTitle() {
-      if (this.chart.type === 'bidirectional-bar') {
+      if (this.chart.type === 'bidirectional-bar' || this.chart.type === 'bar-time-range') {
         return this.$t('chart.xAxis')
       }
       if (this.chart.type === 'chart-mix') {
@@ -764,6 +764,16 @@ span {
 
 .form-item ::v-deep .el-form-item__label {
   font-size: 12px;
+}
+
+.form-item {
+  ::v-deep .el-form-item__content {
+    .el-checkbox {
+      .el-checkbox__label {
+        font-size: 12px;
+      }
+    }
+  }
 }
 
 .no-properties {

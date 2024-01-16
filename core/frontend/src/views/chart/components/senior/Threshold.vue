@@ -7,6 +7,7 @@
         :model="thresholdForm"
         label-width="80px"
         size="mini"
+        @submit.native.prevent
       >
         <el-form-item
           :label="$t('chart.threshold_range')+'(%)'"
@@ -29,6 +30,46 @@
           >
             <div slot="content">
               阈值设置，决定仪表盘区间颜色，为空则不开启阈值，范围(0-100)，逐级递增
+              <br>
+              例如：输入 30,70；表示：分为3段，分别为[0,30],(30,70],(70,100]
+            </div>
+            <i
+              class="el-icon-info"
+              style="cursor: pointer;margin-left: 10px;font-size: 12px;"
+            />
+          </el-tooltip>
+        </el-form-item>
+      </el-form>
+    </el-col>
+    <el-col v-if="chart.type && chart.type === 'liquid'">
+      <el-form
+        ref="thresholdForm"
+        :model="thresholdForm"
+        label-width="80px"
+        size="mini"
+        @submit.native.prevent
+      >
+        <el-form-item
+          :label="$t('chart.threshold_range')+'(%)'"
+          class="form-item"
+        >
+          <span>0,</span>
+          <el-input
+            v-model="thresholdForm.liquidThreshold"
+            style="width: 100px;margin: 0 10px;"
+            :placeholder="$t('chart.threshold_range')"
+            size="mini"
+            clearable
+            @change="gaugeThresholdChange"
+          />
+          <span>,100</span>
+          <el-tooltip
+            class="item"
+            effect="dark"
+            placement="bottom"
+          >
+            <div slot="content">
+              阈值设置，决定水波图颜色，为空则不开启阈值，范围(0-100)，逐级递增
               <br>
               例如：输入 30,70；表示：分为3段，分别为[0,30],(30,70],(70,100]
             </div>
@@ -155,8 +196,17 @@
                 {{ item.min }}&nbsp;≤{{ $t('chart.drag_block_label_value') }}≤&nbsp;{{ item.max }}
               </span>
             </el-col>
-            <el-col :span="6">
+            <el-col
+              :span="3"
+              :title="$t('chart.textColor')"
+            >
               <span :style="{width:'14px', height:'14px', backgroundColor: item.color, border: 'solid 1px #e1e4e8'}" />
+            </el-col>
+            <el-col
+              :span="3"
+              :title="$t('chart.backgroundColor')"
+            >
+              <span :style="{width:'14px', height:'14px', backgroundColor: item.backgroundColor, border: 'solid 1px #e1e4e8'}" />
             </el-col>
           </el-row>
         </el-col>
@@ -212,7 +262,7 @@
               :key="index"
               class="line-style"
             >
-              <el-col :span="6">
+              <el-col :span="4">
                 <span
                   v-if="item.term === 'eq'"
                   :title="$t('chart.filter_eq')"
@@ -266,7 +316,31 @@
                   :title="$t('chart.filter_not_empty')"
                 >{{ $t('chart.filter_not_empty') }}</span>
               </el-col>
-              <el-col :span="10">
+
+              <el-col
+                v-if="!item.term.includes('null') && !item.term.includes('empty')"
+                :span="4"
+              >
+                <span
+                  v-if="item.field === '0'"
+                  :title="$t('chart.field_fixed')"
+                >{{ $t('chart.field_fixed') }}</span>
+                <span
+                  v-if="item.field === '1'"
+                  :title="$t('chart.field_dynamic')"
+                >{{ $t('chart.field_dynamic') }}</span>
+              </el-col>
+              <el-col
+                v-if="item.term.includes('null') || item.term.includes('empty')"
+                :span="4"
+              >
+                  &nbsp;
+              </el-col>
+
+              <el-col
+                v-if="item.field === '0'"
+                :span="10"
+              >
                 <span
                   v-if="!item.term.includes('null') && !item.term.includes('empty') && item.term !== 'between'"
                   :title="item.value"
@@ -276,13 +350,33 @@
                 </span>
                 <span v-else>&nbsp;</span>
               </el-col>
-              <el-col :span="4">
+
+              <el-col
+                v-if="item.field === '1'"
+                :span="10"
+              >
+                <span
+                  v-if="!item.term.includes('null') && !item.term.includes('empty') && item.term !== 'between'"
+                  :title="item.targetField.curField.name + '(' + $t('chart.' + item.targetField.summary) + ')'"
+                >{{ item.targetField.curField.name + '(' + $t('chart.' + item.targetField.summary) + ')' }}</span>
+
+                <span
+                  v-else-if="!item.term.includes('null') && !item.term.includes('empty') && item.term === 'between'"
+                  :title="item.minField.curField.name + '(' + $t('chart.' + item.minField.summary) + ')' + ' ≤' + $t('chart.drag_block_label_value') + '≤ ' + item.maxField.curField.name + '(' + $t('chart.' + item.maxField.summary) + ')'"
+                >
+                  {{ item.minField.curField.name + '(' + $t('chart.' + item.minField.summary) + ')' + ' ≤' + $t('chart.drag_block_label_value') + '≤ ' + item.maxField.curField.name + '(' + $t('chart.' + item.maxField.summary) + ')' }}
+                </span>
+
+                <span v-else>&nbsp;</span>
+              </el-col>
+
+              <el-col :span="2">
                 <span
                   :title="$t('chart.textColor')"
                   :style="{width:'14px', height:'14px', backgroundColor: item.color, border: 'solid 1px #e1e4e8'}"
                 />
               </el-col>
-              <el-col :span="4">
+              <el-col :span="2">
                 <span
                   :title="$t('chart.backgroundColor')"
                   :style="{width:'14px', height:'14px', backgroundColor: item.backgroundColor, border: 'solid 1px #e1e4e8'}"
@@ -363,7 +457,7 @@
       :title="$t('chart.threshold')"
       :visible="editTableThresholdDialog"
       :show-close="false"
-      width="800px"
+      width="1050px"
       class="dialog-css"
       append-to-body
     >
@@ -459,10 +553,10 @@ export default {
     changeThreshold() {
       this.$emit('onThresholdChange', this.thresholdForm)
     },
-    gaugeThresholdChange() {
+    gaugeThresholdChange(val) {
       // check input
-      if (this.thresholdForm.gaugeThreshold) {
-        const arr = this.thresholdForm.gaugeThreshold.split(',')
+      if (val) {
+        const arr = val.split(',')
         for (let i = 0; i < arr.length; i++) {
           const ele = arr[i]
           if (parseFloat(ele).toString() === 'NaN' || parseFloat(ele) <= 0 || parseFloat(ele) >= 100) {
@@ -593,6 +687,10 @@ export default {
     closeTableThreshold() {
       this.editTableThresholdDialog = false
     },
+    fieldValid(field) {
+      // 检查字段和聚合方式是否不为空
+      return field && field.fieldId && field.summary
+    },
     changeTableThreshold() {
       // check line config
       for (let i = 0; i < this.tableThresholdArr.length; i++) {
@@ -624,7 +722,7 @@ export default {
             return
           }
           if (ele.term === 'between') {
-            if (!ele.term.includes('null') && !ele.term.includes('empty') && (!ele.min || !ele.max)) {
+            if (!ele.term.includes('null') && !ele.term.includes('empty') && ((ele.field === '0' && (!ele.min || !ele.max)) || (ele.field === '1' && (!this.fieldValid(ele.minField) || !this.fieldValid(ele.maxField))))) {
               this.$message({
                 message: this.$t('chart.value_can_not_empty'),
                 type: 'error',
@@ -641,7 +739,7 @@ export default {
               return
             }
           } else {
-            if (!ele.term.includes('null') && !ele.term.includes('empty') && !ele.value) {
+            if (!ele.term.includes('null') && !ele.term.includes('empty') && ((ele.field === '0' && !ele.value) || (ele.field === '1' && !this.fieldValid(ele.targetField)))) {
               this.$message({
                 message: this.$t('chart.value_can_not_empty'),
                 type: 'error',
@@ -649,7 +747,7 @@ export default {
               })
               return
             }
-            if ((field.field.deType === 2 || field.field.deType === 3 || field.field.deType === 4) && parseFloat(ele.value).toString() === 'NaN') {
+            if (ele.field === '0' && (field.field.deType === 2 || field.field.deType === 3 || field.field.deType === 4) && parseFloat(ele.value).toString() === 'NaN') {
               this.$message({
                 message: this.$t('chart.value_error'),
                 type: 'error',

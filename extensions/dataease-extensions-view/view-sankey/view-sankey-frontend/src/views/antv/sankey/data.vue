@@ -5,21 +5,30 @@
       <span style="width: 80px;text-align: right;">
         <span>{{ $t('plugin_view_sankey.source') }}</span>/<span>{{ $t('chart.dimension') }}</span>
       </span>
-      <draggable v-model="source" group="drag" animation="300" :move="onMove" class="drag-block-style"
-                 @add="addSource" @update="calcData(true)">
+      <draggable
+        v-model="source"
+        :move="onMove"
+        animation="300"
+        class="drag-block-style"
+        group="drag"
+        @add="addSource"
+        @update="calcData(true)"
+      >
         <transition-group class="draggable-group">
-          <sankey-dimension-item v-for="(item,index) in source" :key="index"
-                                 :param="param"
-                                 :index="0"
-                                 :item="item"
-                                 :dimension-data="dimension"
-                                 :quota-data="quotaData"
-                                 :chart="chart"
-                                 @onDimensionItemRemove="locationItemRemove"
-                                 @onDimensionItemChange="dimensionItemChange"
-                                 @onNameEdit="showRename"
-                                 dimension-name="source"
-                                 :bus="bus"
+          <sankey-dimension-item
+            v-for="(item,index) in source"
+            :key="index"
+            :bus="bus"
+            :chart="chart"
+            :dimension-data="dimension"
+            :index="0"
+            :item="item"
+            :param="param"
+            :quota-data="quotaData"
+            dimension-name="source"
+            @onDimensionItemChange="dimensionItemChange"
+            @onDimensionItemRemove="locationItemRemove"
+            @onNameEdit="showRename"
           />
         </transition-group>
       </draggable>
@@ -33,20 +42,29 @@
       <span style="width: 80px;text-align: right;">
         <span>{{ $t('plugin_view_sankey.target') }}</span>/<span>{{ $t('chart.dimension') }}</span>
       </span>
-      <draggable v-model="target" group="drag" animation="300" :move="onMove" class="drag-block-style"
-                 @add="addTarget" @update="calcData(true)">
+      <draggable
+        v-model="target"
+        :move="onMove"
+        animation="300"
+        class="drag-block-style"
+        group="drag"
+        @add="addTarget"
+        @update="calcData(true)"
+      >
         <transition-group class="draggable-group">
-          <sankey-dimension-item v-for="(item,index) in target" :key="index"
-                                 :param="param"
-                                 :index="1"
-                                 :item="item"
-                                 :dimension-data="dimension"
-                                 :quota-data="quotaData"
-                                 :chart="chart"
-                                 @onDimensionItemRemove="locationItemRemove"
-                                 @onNameEdit="showRename"
-                                 dimension-name="target"
-                                 :bus="bus"
+          <sankey-dimension-item
+            v-for="(item,index) in target"
+            :key="index"
+            :bus="bus"
+            :chart="chart"
+            :dimension-data="dimension"
+            :index="1"
+            :item="item"
+            :param="param"
+            :quota-data="quotaData"
+            dimension-name="target"
+            @onDimensionItemRemove="locationItemRemove"
+            @onNameEdit="showRename"
           />
         </transition-group>
       </draggable>
@@ -59,22 +77,32 @@
     <el-row class="padding-lr" style="margin-top: 6px;">
       <span style="width: 80px;text-align: right;">
         <span>{{ $t('plugin_view_sankey.mark_size') }}</span>/<span>{{ $t('chart.quota') }}</span>
-<!--        <el-tooltip class="item" effect="dark" placement="bottom">
-            <div slot="content">
-              {{ $t('plugin_view_sankey.mark_size_tip') }}
-            </div>
-            <i class="el-icon-info" style="cursor: pointer;color: #606266;"/>
-        </el-tooltip>-->
       </span>
-      <draggable v-model="view.yaxis" group="drag" animation="300" :move="onMove" class="drag-block-style"
-                 @add="addYaxis" @update="calcData(true)">
+      <draggable
+        v-model="view.yaxis"
+        :move="onMove"
+        animation="300"
+        class="drag-block-style"
+        group="drag"
+        @add="addYaxis"
+        @update="calcData(true)"
+      >
         <transition-group class="draggable-group">
-          <sankey-quota-item v-for="(item,index) in view.yaxis" :key="item.id" :param="param" :index="index" :item="item"
-                      :chart="chart" :dimension-data="dimension" :quota-data="quota"
-                      @onQuotaItemChange="quotaItemChange"
-                      @onQuotaItemRemove="quotaItemRemove" @editItemFilter="showQuotaEditFilter"
-                      @onNameEdit="showRename"
-                      @editItemCompare="showQuotaEditCompare"/>
+          <sankey-quota-item
+            v-for="(item,index) in view.yaxis"
+            :key="item.id"
+            :chart="chart"
+            :dimension-data="dimension"
+            :index="index"
+            :item="item"
+            :param="param"
+            :quota-data="quota"
+            @editItemCompare="showQuotaEditCompare"
+            @editItemFilter="showQuotaEditFilter"
+            @onNameEdit="showRename"
+            @onQuotaItemChange="quotaItemChange"
+            @onQuotaItemRemove="quotaItemRemove"
+          />
         </transition-group>
       </draggable>
       <div v-if="!view.yaxis || view.yaxis.length === 0" class="drag-placeholder-style">
@@ -84,22 +112,33 @@
 
     <!-- 结果过滤器 -->
     <el-row class="padding-lr" style="margin-top: 6px;">
-      <span>{{ $t('chart.result_filter') }}</span>
-
-      <draggable v-model="view.customFilter" group="drag" animation="300" :move="onMove" class="theme-item-class"
-                 style="padding:2px 0 0 0;width:100%;min-height: 32px;border-radius: 4px;border: 1px solid #DCDFE6;overflow-x: auto;display: flex;align-items: center;background-color: white;"
-                 @add="addCustomFilter" @update="calcData(true)">
-        <transition-group class="draggable-group">
-          <filter-item v-for="(item,index) in view.customFilter" :key="item.id" :param="param" :index="index"
-                       :item="item" :dimension-data="dimension" :quota-data="quota"
-                       @onFilterItemRemove="filterItemRemove"
-                       @editItemFilter="showEditFilter"/>
-        </transition-group>
-      </draggable>
-      <div v-if="!view.customFilter || view.customFilter.length === 0" class="drag-placeholder-style">
-        <span class="drag-placeholder-style-span">{{ $t('chart.placeholder_field') }}</span>
-      </div>
+      <span class="data-area-label">
+          <span>{{ $t('chart.result_filter') }}</span>
+          <span
+            v-if="!!view.customFilter.logic"
+            class="setting"
+          >{{ $t('chart.is_set') }}</span>
+          <i
+            class="el-icon-arrow-down el-icon-delete data-area-clear"
+            @click="deleteTreeFilter"
+          />
+        </span>
+        <div
+          class="tree-btn"
+          :class="!!view.customFilter.logic && 'active'"
+          @click="openTreeFilter"
+        >
+          <svg-icon
+            class="svg-background"
+            icon-class="icon-filter_outlined"
+          />
+          <span>{{ $t('chart.filter') }}</span>
+        </div>
     </el-row>
+    <FilterTree
+      ref="filterTree"
+     @filter-data="changeFilterData"    @execute-axios="executeAxios"                               
+    />
 
   </div>
 </template>
@@ -109,8 +148,14 @@ import SankeyDimensionItem from '../../../components/views/SankeyDimensionItem'
 import SankeyQuotaItem from '../../../components/views/SankeyQuotaItem'
 import FilterItem from '../../../components/views/FilterItem'
 import messages from '@/de-base/lang/messages'
+import FilterTree from '@/components/views/filter/FilterTree.vue'
 
 export default {
+  provide() {
+    return {
+      filedList: () => this.filedList
+    }
+  },
   props: {
     obj: {
       type: Object,
@@ -121,12 +166,13 @@ export default {
       type: Object,
       required: false,
       default: null
-    },
+    }
   },
   components: {
     SankeyDimensionItem,
     SankeyQuotaItem,
-    FilterItem
+    FilterItem,
+    FilterTree
   },
   data() {
     return {
@@ -148,6 +194,9 @@ export default {
     }
   },
   computed: {
+    filedList() {
+      return [...this.dimension, ...this.quota].filter(ele => ele.id !== 'count')
+    },
     param() {
       return this.obj.param
     },
@@ -169,26 +218,12 @@ export default {
     quotaData() {
       return this.obj.quotaData
     },
-    /*source: {
-      // getter
-      get: function () {
-        return this.view.xaxis && this.view.xaxis.length && [this.view.xaxis[0]] ? [this.view.xaxis[0]] : [];
-      },
-      // setter
-      set: function (newValue) {
-        this.view.xaxis = [...newValue, ...this.target]
-      }
+    selectedDimension() {
+      return this.obj.selectedDimension
     },
-    target: {
-      // getter
-      get: function () {
-        return this.view.xaxis && this.view.xaxis.length && [this.view.xaxis[1]] ? [this.view.xaxis[1]] : [];
-      },
-      // setter
-      set: function (newValue) {
-        this.view.xaxis = [...this.source, ...newValue]
-      }
-    }*/
+    selectedQuota() {
+      return this.obj.selectedQuota
+    }
   },
   created() {
     this.source = this.view.xaxis && this.view.xaxis.length && [this.view.xaxis[0]] || []
@@ -202,18 +237,28 @@ export default {
     target(val) {
       this.view.xaxis = [...this.source, ...this.target]
     },
-    'view.xaxis': function (val, oldVal) {
+    'view.xaxis': function(val, oldVal) {
       if (val) {
         if (val[0] && this.source[0]) {
-          this.source[0].name = val[0].name;
+          this.source[0].name = val[0].name
         }
         if (val[1] && this.target[0]) {
-          this.target[0].name = val[1].name;
+          this.target[0].name = val[1].name
         }
       }
     }
   },
   methods: {
+    changeFilterData(customFilter) {
+      this.view.customFilter =JSON.parse(JSON.stringify(customFilter))
+      this.calcData(true)
+    },
+    openTreeFilter() {
+      this.$refs.filterTree.init(JSON.parse(JSON.stringify(this.view.customFilter)))
+    },
+    deleteTreeFilter() {
+      this.changeFilterData({})
+    },
     executeAxios(url, type, data, callBack) {
       const param = {
         url: url,
@@ -239,45 +284,33 @@ export default {
       this.calcData(true)
     },
 
-
     onMove(e, originalEvent) {
       this.moveId = e.draggedContext.element.id
       return true
     },
 
     addSource(e) {
-      this.dragCheckType(this.source, 'd')
+      this.multiAdd(e, this.source)
       this.dragMoveDuplicate(this.source, e)
+      this.dragCheckType(this.source, 'd')
       if (this.source.length > 1) {
         this.source = [this.source[0]]
       }
       this.calcData(true)
     },
     addTarget(e) {
-      this.dragCheckType(this.target, 'd')
+      this.multiAdd(e, this.target)
       this.dragMoveDuplicate(this.target, e)
+      this.dragCheckType(this.target, 'd')
       if (this.target.length > 1) {
         this.target = [this.target[0]]
       }
       this.calcData(true)
     },
-    /* addLabelItems(e) {
-      this.dragMoveDuplicate(this.labelItems, e)
-      if (this.labelItems.length > 1) {
-        this.labelItems = [this.labelItems[0]]
-      }
-      this.calcData(true)
-    },
-    addTooltipItems(e) {
-      this.dragMoveDuplicate(this.tooltipItems, e)
-      if (this.tooltipItems.length > 1) {
-        this.tooltipItems = [this.tooltipItems[0]]
-      }
-      this.calcData(true)
-    }, */
     addYaxis(e) {
-      this.dragCheckType(this.view.yaxis, 'q')
+      this.multiAdd(e, this.view.yaxis)
       this.dragMoveDuplicate(this.view.yaxis, e)
+      this.dragCheckType(this.view.yaxis, 'q')
       if (this.view.yaxis.length > 1) {
         this.view.yaxis = [this.view.yaxis[0]]
       }
@@ -346,23 +379,46 @@ export default {
     },
     dragCheckType(list, type) {
       if (list && list.length > 0) {
-        for (let i = 0; i < list.length; i++) {
+        for (let i = list.length - 1; i >= 0; i--) {
           if (list[i].groupType !== type) {
             list.splice(i, 1)
           }
         }
       }
     },
+    multiAdd(e, itemList) {
+      // 只处理原始字段拖拽
+      if (!e.item.classList.contains('selected-item')) {
+        return
+      }
+      const groupDie = e.item.classList.contains('group-dimension')
+      const sourceList = groupDie ? this.selectedDimension : this.selectedQuota
+      if (sourceList.length > 1) {
+        const qdList = groupDie ? this.dimensionData : this.quotaData
+        const sourceIds = sourceList.map(i => i.id)
+        const sortedList = qdList.filter(i => sourceIds.includes(i.id))
+        itemList.splice(e.newIndex, 1, ...sortedList)
+      }
+    },
     dragMoveDuplicate(list, e) {
-      const that = this
-      const dup = list.filter(function (m) {
-        return m.id === that.moveId
-      })
-      if (dup && dup.length > 1) {
-        list.splice(e.newDraggableIndex, 1)
+      let newItems = [list[e.newDraggableIndex]]
+      if (e.item.classList.contains('selected-item')) {
+        const groupDie = e.item.classList.contains('group-dimension')
+        newItems = groupDie ? this.selectedDimension : this.selectedQuota
+      }
+      const preIds = list
+          .filter((_, i) => i < e.newDraggableIndex || i >= e.newDraggableIndex + newItems.length)
+          .map(i => i.id)
+      // 倒序删除
+      for (let i = e.newDraggableIndex + newItems.length - 1; i >= e.newDraggableIndex; i--) {
+        if (preIds.includes(list[i].id)) {
+          list.splice(i, 1)
+        }
       }
     },
     addCustomFilter(e) {
+      this.multiAdd(e, this.view.customFilter)
+      this.dragMoveDuplicate(this.view.customFilter, e)
       // 记录数等自动生成字段不做为过滤条件
       if (this.view.customFilter && this.view.customFilter.length > 0) {
         for (let i = 0; i < this.view.customFilter.length; i++) {
@@ -371,7 +427,6 @@ export default {
           }
         }
       }
-      this.dragMoveDuplicate(this.view.customFilter, e)
       this.calcData(true)
     },
     filterItemRemove(item) {
@@ -392,6 +447,53 @@ export default {
 <style lang="scss" scoped>
 .padding-lr {
   padding: 0 6px;
+  .data-area-label {
+    text-align: left;
+    position: relative;
+    width: 100%;
+    display: inline-block;
+    .setting {
+      padding: 0px 4px 0px 4px;
+      border-radius: 2px;
+      background-color: #1F23291A;
+      color: #646A73;
+      position: absolute;
+      top: 1px;
+      right: 23px;
+      font-size: 10px;
+      font-weight: 500;
+      line-height: 14px;
+      height: 16px;
+      z-index: 1;
+    }
+  }
+
+  .tree-btn {
+      width: 100%;
+      background: #fff;
+      height: 32px;
+      border-radius: 4px;
+      border: 1px solid #DCDFE6;
+      display: flex;
+      color: #CCCCCC;
+      align-items: center;
+      cursor: pointer;
+      justify-content: center;
+      font-size: 12px;
+
+      &.active {
+        color: #3370FF;
+        border-color: #3370FF;
+      }
+    }
+    .data-area-clear {
+      position: absolute;
+      top: 4px;
+      right: 6px;
+      color: rgb(135, 141, 159);
+      cursor: pointer;
+      z-index: 1;
+    }
 }
 
 .itxst {

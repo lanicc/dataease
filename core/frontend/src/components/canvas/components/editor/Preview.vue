@@ -59,6 +59,7 @@
           :screen-shot="screenShot"
           :canvas-style-data="canvasStyleData"
           :show-position="showPosition"
+          @filter-loaded="filterLoaded"
         />
       </div>
     </div>
@@ -145,32 +146,31 @@
 </template>
 
 <script>
-import {getStyle} from '@/components/canvas/utils/style'
-import {mapState} from 'vuex'
+import { getStyle } from '@/components/canvas/utils/style'
+import { mapState } from 'vuex'
 import ComponentWrapper from './ComponentWrapper'
-import {changeStyleWithScale} from '@/components/canvas/utils/translate'
-import {uuid} from 'vue-uuid'
-import {deepCopy, imgUrlTrans} from '@/components/canvas/utils/utils'
+import { changeStyleWithScale } from '@/components/canvas/utils/translate'
+import { uuid } from 'vue-uuid'
+import { deepCopy, imgUrlTrans } from '@/components/canvas/utils/utils'
 import eventBus from '@/components/canvas/utils/eventBus'
 import elementResizeDetectorMaker from 'element-resize-detector'
 import CanvasOptBar from '@/components/canvas/components/editor/CanvasOptBar'
 import bus from '@/utils/bus'
-import {buildFilterMap, buildViewKeyMap, formatCondition, valueValid, viewIdMatch} from '@/utils/conditionUtil'
-import {hasDataPermission} from '@/utils/permission'
-import {activeWatermark} from '@/components/canvas/tools/watermark'
-import {proxyUserLoginInfo, userLoginInfo} from '@/api/systemInfo/userLogin'
+import { buildFilterMap, buildViewKeyMap, formatCondition, valueValid, viewIdMatch, buildAfterFilterLoaded } from '@/utils/conditionUtil'
+import { hasDataPermission } from '@/utils/permission'
+import { activeWatermark } from '@/components/canvas/tools/watermark'
+import { proxyUserLoginInfo, userLoginInfo } from '@/api/systemInfo/userLogin'
 import html2canvas from 'html2canvasde'
-import {queryAll} from '@/api/panel/pdfTemplate'
+import { queryAll } from '@/api/panel/pdfTemplate'
 import PDFPreExport from '@/views/panel/export/PDFPreExport'
-import {listenGlobalKeyDownPreview} from '@/components/canvas/utils/shortcutKey'
+import { listenGlobalKeyDownPreview } from '@/components/canvas/utils/shortcutKey'
 import UserViewDialog from '@/components/canvas/customComponent/UserViewDialog'
-import {hexColorToRGBA} from "@/views/chart/chart/util";
-import {isMobile} from '@/utils/index'
-
+import { hexColorToRGBA } from '@/views/chart/chart/util'
+import { isMobile } from '@/utils/index'
 
 const erd = elementResizeDetectorMaker()
 export default {
-  components: {UserViewDialog, ComponentWrapper, CanvasOptBar, PDFPreExport},
+  components: { UserViewDialog, ComponentWrapper, CanvasOptBar, PDFPreExport },
   model: {
     prop: 'show',
     event: 'change'
@@ -207,14 +207,14 @@ export default {
     componentData: {
       type: Array,
       required: false,
-      default: function () {
+      default: function() {
         return []
       }
     },
     canvasStyleData: {
       type: Object,
       required: false,
-      default: function () {
+      default: function() {
         return {}
       }
     },
@@ -261,7 +261,9 @@ export default {
       ],
       needToChangeWidth: [
         'left',
-        'width',
+        'width'
+      ],
+      needToChangeInnerWidth: [
         'fontSize',
         'activeFontSize',
         'borderWidth',
@@ -274,6 +276,7 @@ export default {
       mainWidth: '100%',
       mainHeight: '100%',
       searchCount: 0,
+      filterMapCache: {},
       // 布局展示 1.pc pc端布局 2.mobile 移动端布局
       terminal: 'pc',
       buttonFilterMap: null,
@@ -371,6 +374,7 @@ export default {
       return this.componentDataShow || []
     },
     ...mapState([
+      'previewCanvasScale',
       'isClickComponent'
     ]),
 
@@ -380,6 +384,21 @@ export default {
     },
     filterMap() {
       const result = buildFilterMap(this.componentData)
+      Object.keys(result).forEach(ele => {
+        if (this.filterMapCache[ele]?.length) {
+          result[ele].forEach(itx => {
+            const condition = this.filterMapCache[ele].find(item => item.componentId === itx.componentId && itx.cacheObj)
+            if (condition) {
+              itx.cacheObj = condition.cacheObj
+            }
+          })
+          if (!result[ele].length) {
+            result[ele] = this.filterMapCache[ele]
+          }
+        } else {
+          this.filterMapCache[ele] = result[ele]
+        }
+      })
       if (this.searchButtonInfo && this.searchButtonInfo.buttonExist && !this.searchButtonInfo.autoTrigger && this.searchButtonInfo.relationFilterIds) {
         for (const key in result) {
           if (Object.hasOwnProperty.call(result, key)) {
@@ -451,19 +470,24 @@ export default {
     if (this.$refs[this.previewRefId]) {
       erd.uninstall(this.$refs[this.previewRefId])
     }
-    erd.uninstall(this.canvasMain)
-    erd.uninstall(this.tempCanvas)
+    this.canvasMain && erd.uninstall(this.canvasMain)
+    this.tempCanvas && erd.uninstall(this.tempCanvas)
     clearInterval(this.timer)
     this.canvasId === 'canvas-main' && bus.$off('pcChartDetailsDialog', this.openChartDetailsDialog)
     bus.$off('trigger-search-button', this.triggerSearchButton)
     bus.$off('trigger-reset-button', this.triggerResetButton)
   },
   methods: {
+    filterLoaded(p) {
+      buildAfterFilterLoaded(this.filterMap, p)
+      this.filterMapCache = {}
+      this.getWrapperChildRefs().forEach(item => item.triggerFilterLoaded(p))
+    },
     getWrapperChildRefs() {
       return this.$refs['viewWrapperChild']
     },
     getAllWrapperChildRefs() {
-      let allChildRefs = []
+      const allChildRefs = []
       const currentChildRefs = this.getWrapperChildRefs()
       if (currentChildRefs && currentChildRefs.length > 0) {
         allChildRefs.push.apply(allChildRefs, currentChildRefs)
@@ -562,7 +586,23 @@ export default {
 
       result.relationFilterIds = matchFilters.map(item => item.id)
 
+      let matchViewIds = []
+      for (let index = 0; index < matchFilters.length; index++) {
+        const item = matchFilters[index]
+        if (!item.options.attrs.viewIds?.length) {
+          matchViewIds = null
+          break
+        }
+        matchViewIds = matchViewIds.concat(item.options.attrs.viewIds)
+      }
       let viewKeyMap = buildViewKeyMap(panelItems)
+      if (matchViewIds) {
+        matchViewIds = [...new Set(matchViewIds)]
+        const keys = Object.keys(viewKeyMap).filter(key => !matchViewIds.includes(key))
+        keys.forEach(key => {
+          delete viewKeyMap[key]
+        })
+      }
       viewKeyMap = this.buildViewKeyFilters(matchFilters, viewKeyMap, isClear)
       result.filterMap = viewKeyMap
       return result
@@ -587,7 +627,10 @@ export default {
         }
         param = wrapperChild.getCondition && wrapperChild.getCondition()
         const condition = formatCondition(param)
-        const vValid = valueValid(condition)
+        let vValid = valueValid(condition)
+        const required = element.options.attrs.required
+        condition.requiredInvalid = required && !vValid
+        vValid = vValid || required
         const filterComponentId = condition.componentId
         const conditionCanvasId = wrapperChild.getCanvasId && wrapperChild.getCanvasId()
         Object.keys(result).forEach(viewId => {
@@ -649,7 +692,7 @@ export default {
     },
     clearAllLinkage() {
       this.$store.commit('clearPanelLinkageInfo')
-      bus.$emit('clear_panel_linkage', {viewId: 'all'})
+      bus.$emit('clear_panel_linkage', { viewId: 'all' })
     },
     changeStyleWithScale,
     getStyle,
@@ -665,8 +708,8 @@ export default {
       }
       if (this.isMainCanvas()) {
         this.$store.commit('setPreviewCanvasScale', {
-          scaleWidth: (this.scaleWidth / 100),
-          scaleHeight: (this.scaleHeight / 100)
+          scaleWidth: (this.canvasStyleData.autoSizeAdaptor || this.terminal === 'mobile') ? (this.scaleWidth / 100) : 1,
+          scaleHeight: (this.canvasStyleData.autoSizeAdaptor || this.terminal === 'mobile') ? (this.scaleHeight / 100) : 1
         })
       }
       this.handleScaleChange()
@@ -682,6 +725,10 @@ export default {
     format(value, scale) {
       return value * scale / 100
     },
+
+    formatPoint(value, pointScale) {
+      return value * pointScale
+    },
     handleScaleChange() {
       if (this.componentData) {
         const componentData = deepCopy(this.componentData)
@@ -691,10 +738,13 @@ export default {
               component.style[key] = this.format(component.style[key], this.scaleHeight)
             }
             if (this.needToChangeWidth.includes(key)) {
+              component.style[key] = this.format(component.style[key], this.scaleWidth)
+            }
+            if (this.needToChangeInnerWidth.includes(key)) {
               if ((key === 'fontSize' || key === 'activeFontSize') && (this.terminal === 'mobile' || ['custom', 'v-text'].includes(component.type))) {
                 // do nothing 移动端字符大小无需按照比例缩放，当前保持不变(包括 v-text 和 过滤组件)
               } else {
-                component.style[key] = this.format(component.style[key], this.scaleWidth)
+                component.style[key] = this.formatPoint(component.style[key], this.previewCanvasScale.scalePointWidth)
               }
             }
           })
@@ -714,7 +764,7 @@ export default {
     },
     deselectCurComponent(e) {
       if (!this.isClickComponent) {
-        this.$store.commit('setCurComponent', {component: null, index: null})
+        this.$store.commit('setCurComponent', { component: null, index: null })
         if (this.$refs?.['canvas-opt-bar']) {
           this.$refs['canvas-opt-bar'].setWidgetStatus()
         }

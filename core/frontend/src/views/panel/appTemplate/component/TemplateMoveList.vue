@@ -43,16 +43,16 @@
         secondary
         @click="cancel()"
       >{{
-          $t('commons.cancel')
-        }}
+        $t('commons.cancel')
+      }}
       </deBtn>
       <deBtn
         type="primary"
-        @click="save()"
         :disabled="!activeTemplate"
+        @click="save()"
       >{{
-          $t('commons.confirm')
-        }}
+        $t('commons.confirm')
+      }}
       </deBtn>
     </el-row>
   </div>
@@ -148,7 +148,7 @@ export default {
     align-items: center;
     border-radius: 4px;
     color: var(--deTextPrimary, #1f2329);
-    font-family: "PingFang SC";
+    font-family: "AlibabaPuHuiTi";
     font-style: normal;
     font-weight: 500;
     font-size: 14px;

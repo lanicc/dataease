@@ -75,10 +75,12 @@ echo -e "*******************************************************\n" 2>&1 | tee -
 
 if [[ -f $dataease_conf ]]; then
    DE_LOGIN_TIMEOUT=$(prop $dataease_conf dataease.login_timeout)
+   DE_INIT_PASSWORD=$(prop $dataease_conf dataease.init_password)
    DE_MYSQL_PARAMS=$(grep -P "^\s*[^#]?spring.datasource.url=.*$" $dataease_conf | cut -d'=' --complement -f1 | awk -F'?' '{print $2}')
 fi
 export DE_MYSQL_PARAMS
 export DE_LOGIN_TIMEOUT=$([[ -z $DE_LOGIN_TIMEOUT ]] && echo -n 480 || echo -n $DE_LOGIN_TIMEOUT)
+export DE_INIT_PASSWORD=$([[ -z $DE_INIT_PASSWORD ]] && echo -n DataEase123456 || echo -n $DE_INIT_PASSWORD)
 
 if [[ -f $dataease_conf ]] && [[ ! ${DE_EXTERNAL_DORIS} ]]; then
    export DE_DORIS_DB=$(prop $dataease_conf doris.db)
@@ -123,9 +125,19 @@ keep_doris="false"
 if [[ -f ${DE_RUN_BASE}/docker-compose-doris.yml ]]; then
    current_doris_version=$(grep '^    image:' ${DE_RUN_BASE}/docker-compose-doris.yml | head -1 | cut -d ':' -f3)
    if [[ ! $current_doris_version =~ "v1.2.4" ]]; then
-      echo "不升级doris，备份 docker-compose-doris.yml 文件"
+      echo "不升级doris，备份 docker-compose-doris.yml 文件" | tee -a ${CURRENT_DIR}/install.log
       keep_doris="true"
       \cp ${DE_RUN_BASE}/docker-compose-doris.yml ${DE_RUN_BASE}/docker-compose-doris.yml.bak
+   fi
+fi
+
+keep_mysql="false"
+if [[ -f ${DE_RUN_BASE}/docker-compose-mysql.yml ]]; then
+   current_mysql_version=$(grep '^    image:' ${DE_RUN_BASE}/docker-compose-mysql.yml | head -1 | cut -d ':' -f3)
+   if [[ ! $current_mysql_version =~ "8." ]]; then
+      echo "不升级MySQL，备份 docker-compose-mysql.yml 文件" | tee -a ${CURRENT_DIR}/install.log
+      keep_mysql="true"
+      \cp ${DE_RUN_BASE}/docker-compose-mysql.yml ${DE_RUN_BASE}/docker-compose-mysql.yml.bak
    fi
 fi
 
@@ -154,6 +166,10 @@ mkdir -p ${DE_RUN_BASE}/data/business
 
 if [ ${keep_doris} = "true" ]; then
    \mv ${DE_RUN_BASE}/docker-compose-doris.yml.bak ${DE_RUN_BASE}/docker-compose-doris.yml
+fi
+
+if [ ${keep_mysql} = "true" ]; then
+   \mv ${DE_RUN_BASE}/docker-compose-mysql.yml.bak ${DE_RUN_BASE}/docker-compose-mysql.yml
 fi
 
 DE_MYSQL_HOST_ORIGIN=$DE_MYSQL_HOST
@@ -351,25 +367,5 @@ log "启动服务"
 dectl reload | tee -a ${CURRENT_DIR}/install.log
 dectl status 2>&1 | tee -a ${CURRENT_DIR}/install.log
 
-for b in {1..30}
-do
-   sleep 3
-   http_code=$(curl -sILw "%{http_code}\n" http://localhost:${DE_PORT} -o /dev/null)
-   if [[ $http_code == 000 ]];then
-      log "服务启动中，请稍候 ..."
-   elif [[ $http_code == 200 ]];then
-      log "服务启动成功!"
-      break;
-   else
-      log "服务启动出错!"
-      exit 1
-   fi
-done
-
-if [[ $http_code != 200 ]];then
-   log "【警告】服务在等待时间内未完全启动！请稍后使用 dectl status 检查服务运行状况。"
-fi
-
 echo -e "======================= 安装完成 =======================\n" 2>&1 | tee -a ${CURRENT_DIR}/install.log
 echo -e "请通过以下方式访问:\n URL: http://\$LOCAL_IP:$DE_PORT\n 用户名: admin\n 初始密码: dataease" 2>&1 | tee -a ${CURRENT_DIR}/install.log
-

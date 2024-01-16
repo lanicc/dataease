@@ -145,7 +145,7 @@
           :target="curComponent.hyperlinks.openMode "
           :href="curComponent.hyperlinks.content "
         >
-          <i class="icon iconfont icon-com-jump"/>
+          <i class="icon iconfont icon-com-jump" />
         </a>
       </span>
 
@@ -153,6 +153,7 @@
         v-if="chart && showMapLayerController"
         :chart="chart"
         :series-id-map="seriesIdMap"
+        :show-edit-position="showEditPosition"
       />
     </div>
 
@@ -573,6 +574,7 @@ export default {
 
 <style lang="scss" scoped>
 .bar-main {
+  line-height: 24px;
   position: absolute;
   float: right;
   z-index: 10;

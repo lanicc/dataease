@@ -9,7 +9,7 @@ import io.dataease.commons.constants.DePermissionType;
 import io.dataease.commons.constants.ResourceAuthLevel;
 import io.dataease.commons.model.AuthURD;
 
-import io.dataease.plugins.config.SpringContextUtil;
+import io.dataease.plugins.common.util.SpringContextUtil;
 import io.dataease.plugins.xpack.auth.dto.request.XpackBaseTreeRequest;
 import io.dataease.plugins.xpack.auth.dto.response.XpackVAuthModelDTO;
 import io.dataease.plugins.xpack.auth.service.AuthXpackService;
@@ -69,6 +69,10 @@ public class AuthUtils {
             userIds.addAll(request.getUserIds());
         }
         return userIds;
+    }
+
+    public static Set<String> accountByURD(AuthURD request) {
+        return extAuthService.userNamesByRD(request);
     }
 
     public static List<String> parentResources(String resourceId, String type) {

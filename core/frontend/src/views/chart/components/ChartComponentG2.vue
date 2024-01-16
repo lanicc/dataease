@@ -12,9 +12,10 @@
       @trackClick="trackClick"
     />
     <span
-      v-if="chart.type && antVRenderStatus"
+      v-if="chart.type"
       v-show="title_show"
       ref="title"
+      :class="titleIsRight"
       :style="title_class"
       style="cursor: default;display: block;"
     >
@@ -44,7 +45,7 @@ import { baseLiquid } from '@/views/chart/chart/liquid/liquid'
 import { uuid } from 'vue-uuid'
 import ViewTrackBar from '@/components/canvas/components/editor/ViewTrackBar'
 import { getRemark, hexColorToRGBA } from '@/views/chart/chart/util'
-import { baseBarOptionAntV, hBaseBarOptionAntV, baseBidirectionalBarOptionAntV } from '@/views/chart/chart/bar/bar_antv'
+import { baseBarOptionAntV, hBaseBarOptionAntV, baseBidirectionalBarOptionAntV, timeRangeBarOptionAntV } from '@/views/chart/chart/bar/bar_antv'
 import { baseAreaOptionAntV, baseLineOptionAntV } from '@/views/chart/chart/line/line_antv'
 import { basePieOptionAntV, basePieRoseOptionAntV } from '@/views/chart/chart/pie/pie_antv'
 import { baseScatterOptionAntV } from '@/views/chart/chart/scatter/scatter_antv'
@@ -126,14 +127,17 @@ export default {
       remarkCfg: {
         show: false,
         content: ''
-      }
-
+      },
+      resizeTimer: null
     }
   },
 
   computed: {
     trackBarStyleTime() {
       return this.trackBarStyle
+    },
+    titleIsRight() {
+      return this.title_class?.textAlign === 'right' && 'title-is-right'
     },
     bg_class() {
       return {
@@ -152,17 +156,9 @@ export default {
     chart: {
       handler(newVal, oldVla) {
         this.initTitle()
-        this.calcHeightDelay()
-        new Promise((resolve) => {
-          resolve()
-        }).then(() => {
-          this.drawView()
-        })
+        this.calcHeightRightNow(this.drawView)
       },
       deep: true
-    },
-    resize() {
-      this.drawEcharts()
     }
   },
   beforeDestroy() {
@@ -188,7 +184,7 @@ export default {
     for (const key in this.pointParam) {
       this.$delete(this.pointParam, key)
     }
-    window.removeEventListener('resize', this.calcHeightDelay)
+    window.removeEventListener('resize', this.chartResize)
     this.myChart = null
   },
   mounted() {
@@ -234,18 +230,11 @@ export default {
     },
     preDraw() {
       this.initTitle()
-      this.calcHeightDelay()
-      new Promise((resolve) => {
-        resolve()
-      }).then(() => {
-        this.drawView()
-      })
-      window.addEventListener('resize', this.calcHeightDelay)
+      this.calcHeightRightNow(this.drawView)
+      window.addEventListener('resize', this.chartResize)
     },
-    drawView() {
+    async drawView() {
       const chart = JSON.parse(JSON.stringify(this.chart))
-      // type
-      // if (chart.data) {
       this.antVRenderStatus = true
       if (!chart.data || (!chart.data.data && !chart.data.series)) {
         chart.data = {
@@ -269,6 +258,8 @@ export default {
         this.myChart = hBaseBarOptionAntV(this.myChart, this.chartId, chart, this.antVAction, true, false)
       } else if (equalsAny(chart.type, 'bar-stack-horizontal', 'percentage-bar-stack-horizontal')) {
         this.myChart = hBaseBarOptionAntV(this.myChart, this.chartId, chart, this.antVAction, false, true)
+      } else if (equalsAny(chart.type, 'bar-time-range')) {
+        this.myChart = timeRangeBarOptionAntV(this.myChart, this.chartId, chart, this.antVAction)
       } else if (chart.type === 'line') {
         this.myChart = baseLineOptionAntV(this.myChart, this.chartId, chart, this.antVAction)
       } else if (chart.type === 'area') {
@@ -298,7 +289,7 @@ export default {
       } else if (chart.type === 'chart-mix') {
         this.myChart = baseMixOptionAntV(this.myChart, this.chartId, chart, this.antVAction)
       } else if (chart.type === 'flow-map') {
-        this.myChart = baseFlowMapOption(this.myChart, this.chartId, chart, this.antVAction)
+        this.myChart = await baseFlowMapOption(this.myChart, this.chartId, chart, this.antVAction)
       } else if (chart.type === 'bidirectional-bar') {
         this.myChart = baseBidirectionalBarOptionAntV(this.myChart, this.chartId, chart, this.antVAction)
       } else {
@@ -338,7 +329,6 @@ export default {
       }
       this.setBackGroundBorder()
     },
-
     antVAction(param) {
       switch (this.chart.type) {
         case 'treemap':
@@ -355,7 +345,8 @@ export default {
       }
       this.linkageActiveParam = {
         category: this.pointParam.data.category ? this.pointParam.data.category : 'NO_DATA',
-        name: this.pointParam.data.name ? this.pointParam.data.name : 'NO_DATA'
+        name: this.pointParam.data.name ? this.pointParam.data.name : 'NO_DATA',
+        group: this.pointParam.data.group ? this.pointParam.data.group : 'NO_DATA'
       }
       if (this.trackMenu.length < 2) { // 只有一个事件直接调用
         this.trackClick(this.trackMenu[0])
@@ -374,7 +365,10 @@ export default {
       }
     },
     chartResize() {
-      this.calcHeightDelay()
+      this.resizeTimer && clearTimeout(this.resizeTimer)
+      this.resizeTimer = setTimeout(() => {
+        this.calcHeightRightNow()
+      }, 100)
     },
     trackClick(trackAction) {
       const param = this.pointParam
@@ -385,21 +379,40 @@ export default {
         }
         return
       }
-      const quotaList = this.pointParam.data.quotaList
-      quotaList[0]['value'] = this.pointParam.data.value
+      let quotaList = this.pointParam.data.quotaList
+      if (this.chart.type === 'bar-time-range') {
+        quotaList = this.pointParam.data.dimensionList
+      } else {
+        quotaList[0]['value'] = this.pointParam.data.value
+      }
       const linkageParam = {
         option: 'linkage',
         name: this.pointParam.data.name,
         viewId: this.chart.id,
         dimensionList: this.pointParam.data.dimensionList,
-        quotaList: quotaList
+        quotaList: quotaList,
+        category: this.pointParam.data.category,
+        group: this.pointParam.data.group
       }
       const jumpParam = {
         option: 'jump',
         name: this.pointParam.data.name,
         viewId: this.chart.id,
         dimensionList: this.pointParam.data.dimensionList,
-        quotaList: quotaList
+        quotaList: quotaList,
+        category: this.pointParam.data.category,
+        group: this.pointParam.data.group
+      }
+
+      if (this.chart.type === 'scatter' && this.chart.render === 'antv') {
+        const xAxis = JSON.parse(this.chart.xaxis)
+        if (xAxis && xAxis[0] && xAxis[0].groupType === 'q') {
+          linkageParam.scatterSpecial = true
+          linkageParam.scatterSpecialData = this.pointParam.data
+
+          jumpParam.scatterSpecial = true
+          jumpParam.scatterSpecialData = this.pointParam.data
+        }
       }
 
       switch (trackAction) {
@@ -445,21 +458,18 @@ export default {
       this.initRemark()
     },
 
-    calcHeightRightNow() {
+    calcHeightRightNow(callback) {
       this.$nextTick(() => {
         if (this.$refs.chartContainer) {
-          const currentHeight = this.$refs.chartContainer.offsetHeight
+          const { offsetHeight } = this.$refs.chartContainer
+          let titleHeight = 0
           if (this.$refs.title) {
-            const titleHeight = this.$refs.title.offsetHeight
-            this.chartHeight = (currentHeight - titleHeight) + 'px'
+            titleHeight = this.$refs.title.offsetHeight
           }
+          this.chartHeight = (offsetHeight - titleHeight) + 'px'
+          this.$nextTick(() => callback?.())
         }
       })
-    },
-    calcHeightDelay() {
-      setTimeout(() => {
-        this.calcHeightRightNow()
-      }, 100)
     },
     initRemark() {
       this.remarkCfg = getRemark(this.chart)
@@ -471,6 +481,14 @@ export default {
 .g2-container {
   ::v-deep .g2-tooltip {
     position: fixed !important;
+  }
+}
+
+.fullscreen, .show-in-dialog {
+  .g2-container {
+    ::v-deep .g2-tooltip {
+      position: absolute !important;
+    }
   }
 }
 </style>

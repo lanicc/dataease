@@ -22,14 +22,14 @@ import layer from '@/components/canvas/store/layer'
 import snapshot from '@/components/canvas/store/snapshot'
 import lock from '@/components/canvas/store/lock'
 import task from './modules/task'
-import {formatCondition, valueValid} from '@/utils/conditionUtil'
-import {Condition} from '@/components/widget/bean/Condition'
+import { formatCondition, valueValid } from '@/utils/conditionUtil'
+import { Condition } from '@/components/widget/bean/Condition'
 
-import {DEFAULT_COMMON_CANVAS_STYLE_STRING} from '@/views/panel/panel'
+import { DEFAULT_COMMON_CANVAS_STYLE_STRING } from '@/views/panel/panel'
 import bus from '@/utils/bus'
-import {BASE_MOBILE_STYLE} from '@/components/canvas/customComponent/component-list'
-import {TYPE_CONFIGS} from '@/views/chart/chart/util'
-import {deepCopy} from '@/components/canvas/utils/utils'
+import { BASE_MOBILE_STYLE } from '@/components/canvas/customComponent/component-list'
+import { TYPE_CONFIGS } from '@/views/chart/chart/util'
+import { deepCopy } from '@/components/canvas/utils/utils'
 
 Vue.use(Vuex)
 
@@ -92,6 +92,8 @@ const data = {
     componentGap: 5,
     // 移动端布局状态
     mobileLayoutStatus: false,
+    // 是否是mobile
+    mobileStatus: false,
     // 公共链接状态(当前是否是公共链接打开)
     publicLinkStatus: false,
     pcTabMatrixCount: {
@@ -154,7 +156,8 @@ const data = {
     previewComponentData: [],
     currentCanvasNewId: [],
     lastViewRequestInfo: {},
-    multiplexingStyleAdapt: true //复用样式跟随主题
+    multiplexingStyleAdapt: true, // 复用样式跟随主题
+    lastValidFilters: {}
   },
   mutations: {
     ...animation.mutations,
@@ -199,7 +202,7 @@ const data = {
       })
     },
 
-    setCurComponent(state, {component, index}) {
+    setCurComponent(state, { component, index }) {
       if (!component && state.curComponent) {
         Vue.set(state.curComponent, 'editing', false)
       }
@@ -237,7 +240,7 @@ const data = {
         state.previewCanvasScale.scalePointHeight = scale.scaleHeight
       }
     },
-    setShapeStyle({curComponent, canvasStyleData, curCanvasScaleMap}, {top, left, width, height, rotate}) {
+    setShapeStyle({ curComponent, canvasStyleData, curCanvasScaleMap }, { top, left, width, height, rotate }) {
       if (curComponent) {
         const curCanvasScaleSelf = curCanvasScaleMap[curComponent.canvasId]
         if (top || top === 0) curComponent.style.top = Math.round((top / curCanvasScaleSelf.scalePointHeight))
@@ -248,7 +251,7 @@ const data = {
       }
     },
 
-    setShapeSingleStyle({curComponent}, {key, value}) {
+    setShapeSingleStyle({ curComponent }, { key, value }) {
       curComponent.style[key] = value
     },
 
@@ -272,14 +275,14 @@ const data = {
     setMobileComponentData(state, mobileComponentData = []) {
       Vue.set(state, 'mobileComponentData', mobileComponentData)
     },
-    addComponent(state, {component, index}) {
+    addComponent(state, { component, index }) {
       if (index !== undefined) {
         state.componentData.splice(index, 0, component)
       } else {
         state.componentData.push(component)
         state.currentCanvasNewId.push(component.id)
       }
-      this.commit('setCurComponent', {component: component, index: index || state.componentData.length - 1})
+      this.commit('setCurComponent', { component: component, index: index === undefined ? state.componentData.length - 1 : index })
     },
     removeViewFilter(state, componentId) {
       state.componentData = state.componentData.map(item => {
@@ -305,8 +308,11 @@ const data = {
     },
 
     addViewFilter(state, data) {
+      const required = data.component.options.attrs.required
       const condition = formatCondition(data)
-      const vValid = valueValid(condition)
+      let vValid = valueValid(condition)
+      condition.requiredInvalid = required && !vValid
+      vValid = vValid || required
       //   1.根据componentId过滤
       const filterComponentId = condition.componentId
       const canvasId = data.canvasId
@@ -370,7 +376,7 @@ const data = {
         trackInfo = state.nowPanelTrackInfo
         // 兼容情况，当源视图多个字段匹配目标视图一个字段的时候，默认只保留当前点击的维度，将改维度排序到组件结尾，去重时即可保留
         const activeDimensionIndex = data.dimensionList.findIndex(dimension => dimension.id === data.name)
-        if (activeDimensionIndex > -1 && activeDimensionIndex != dimensionSort.length - 1) {
+        if (activeDimensionIndex > -1 && activeDimensionIndex !== dimensionSort.length - 1) {
           const dimensionLast = dimensionSort[dimensionSort.length - 1]
           dimensionSort[dimensionSort.length - 1] = dimensionSort[activeDimensionIndex]
           dimensionSort[activeDimensionIndex] = dimensionLast
@@ -417,7 +423,7 @@ const data = {
           }
           state.componentData[index] = element
         }
-        if (!element.type || element.type !== 'view') continue
+        if (!element.type || (element.type !== 'view' && element.type !== 'custom')) continue
         const currentFilters = element.linkageFilters || [] // 当前联动filter
         // 联动的视图情况历史条件
         // const currentFilters = []
@@ -429,7 +435,7 @@ const data = {
           targetInfoList.forEach(targetInfo => {
             const targetInfoArray = targetInfo.split('#')
             const targetViewId = targetInfoArray[0] // 目标视图
-            if (element.propValue.viewId === targetViewId) { // 如果目标视图 和 当前循环组件id相等 则进行条件增减
+            if (element.type === 'view' && element.propValue.viewId === targetViewId) { // 如果目标视图 和 当前循环组件id相等 则进行条件增减
               const targetFieldId = targetInfoArray[1] // 目标视图列ID
               const condition = new Condition('', targetFieldId, 'eq', [dimension.value], [targetViewId])
               condition.sourceViewId = viewId
@@ -445,10 +451,27 @@ const data = {
               // !filterExist && vValid && currentFilters.push(condition)
               currentFilters.push(condition)
             }
+            if (element.type === 'custom' && element.id === targetViewId) { // 过滤组件处理
+              if (['de-select-tree'].includes(element.component)) {
+                element.options.value = dimension.value
+              } else {
+                element.options.value = [dimension.value]
+              }
+              // 去掉动态时间
+              if (element.options.manualModify) {
+                element.options.manualModify = false
+              }
+              // 去掉首选项
+              if (element.options?.attrs?.selectFirst) {
+                element.options.attrs.selectFirst = false
+              }
+            }
           })
         })
 
-        element.linkageFilters = currentFilters
+        if (element.type === 'view') {
+          element.linkageFilters = currentFilters
+        }
         state.componentData[index] = element
       }
     },
@@ -460,17 +483,27 @@ const data = {
 
         for (let index = 0; index < state.componentData.length; index++) {
           const element = state.componentData[index]
-          if (!element.type || element.type !== 'view') continue
+          if (!element.type || (element.type !== 'view' && element.type !== 'custom')) continue
           const currentFilters = element.outerParamsFilters || [] // 外部参数信息
 
           // 外部参数 可能会包含多个参数
-          Object.keys(params).forEach(function (sourceInfo) {
+          Object.keys(params).forEach(function(sourceInfo) {
             // 获取外部参数的值 sourceInfo 是外部参数名称 支持数组传入
             let paramValue = params[sourceInfo]
+            let paramValueStr = params[sourceInfo]
             let operator = 'in'
             if (paramValue && !Array.isArray(paramValue)) {
               paramValue = [paramValue]
               operator = 'eq'
+            } else if (paramValue && Array.isArray(paramValue)) {
+              paramValueStr = ''
+              paramValue.forEach((innerValue, index) => {
+                if (index === 0) {
+                  paramValueStr = innerValue
+                } else {
+                  paramValueStr = paramValueStr + ',' + innerValue
+                }
+              })
             }
             // 获取所有目标联动信息
             const targetInfoList = trackInfo[sourceInfo] || []
@@ -478,7 +511,7 @@ const data = {
             targetInfoList.forEach(targetInfo => {
               const targetInfoArray = targetInfo.split('#')
               const targetViewId = targetInfoArray[0] // 目标视图
-              if (element.propValue.viewId === targetViewId) { // 如果目标视图 和 当前循环组件id相等 则进行条件增减
+              if (element.type === 'view' && element.propValue.viewId === targetViewId) { // 如果目标视图 和 当前循环组件id相等 则进行条件增减
                 const targetFieldId = targetInfoArray[1] // 目标视图列ID
                 const condition = new Condition('', targetFieldId, operator, paramValue, [targetViewId])
                 let j = currentFilters.length
@@ -493,8 +526,25 @@ const data = {
                 // !filterExist && vValid && currentFilters.push(condition)
                 currentFilters.push(condition)
               }
+              if (element.type === 'custom' && element.id === targetViewId) { // 过滤组件处理
+                if (['de-select-tree'].includes(element.component)) {
+                  element.options.value = paramValueStr
+                } else {
+                  element.options.value = paramValue
+                }
+                // 去掉动态时间
+                if (element.options.manualModify) {
+                  element.options.manualModify = false
+                }
+                // 去掉首选项
+                if (element.options?.attrs?.selectFirst) {
+                  element.options.attrs.selectFirst = false
+                }
+              }
             })
-            element.outerParamsFilters = currentFilters
+            if (element.type === 'view') {
+              element.outerParamsFilters = currentFilters
+            }
             state.componentData[index] = element
           })
         }
@@ -512,6 +562,9 @@ const data = {
       state.componentData.push(component)
     },
     deleteComponentWithId(state, id) {
+      if (state.lastValidFilters && state.lastValidFilters[id]) {
+        delete state.lastValidFilters[id]
+      }
       for (let index = 0; index < state.componentData.length; index++) {
         const element = state.componentData[index]
         if (element.id && element.id === id) {
@@ -573,6 +626,9 @@ const data = {
     },
     setMobileLayoutStatus(state, status) {
       state.mobileLayoutStatus = status
+    },
+    setMobileStatus(state, status) {
+      state.mobileStatus = status
     },
     setPublicLinkStatus(state, status) {
       state.publicLinkStatus = status
@@ -663,13 +719,13 @@ const data = {
         }
       }
     },
-    updateComponentViewsData(state, {viewId, propertyKey, propertyValue}) {
+    updateComponentViewsData(state, { viewId, propertyKey, propertyValue }) {
       state.componentViewsData[viewId][propertyKey] = propertyValue
     },
     removeCurMultiplexingComponentWithId(state, id) {
       delete state.curMultiplexingComponents[id]
     },
-    addCurMultiplexingComponent(state, {component, componentId}) {
+    addCurMultiplexingComponent(state, { component, componentId }) {
       if (componentId) {
         if (component.type === 'custom-button' && component.serviceName === 'buttonSureWidget') {
           const copyComponent = deepCopy(component)
@@ -766,7 +822,8 @@ const data = {
       state.changeProperties[propertyInfo.custom][propertyInfo.property] = propertyInfo.value
     },
     initCanvasBase(state) {
-      this.commit('setCurComponent', {component: null, index: null})
+      this.commit('resetLastValidFilters')
+      this.commit('setCurComponent', { component: null, index: null })
       this.commit('clearLinkageSettingInfo', false)
       this.commit('resetViewEditInfo')
       this.commit('initCurMultiplexingComponents')
@@ -836,6 +893,10 @@ const data = {
         for (let index = 0; index < state.componentData.length; index++) {
           const element = state.componentData[index]
           if (element.canvasId && element.canvasId.includes(canvasId)) {
+            const cid = state.componentData[index]
+            if (state.lastValidFilters && state.lastValidFilters[cid]) {
+              delete state.lastValidFilters[cid]
+            }
             state.componentData.splice(index, 1)
           }
         }
@@ -856,10 +917,21 @@ const data = {
         }
       })
 
-      bus.$emit('clear_panel_linkage', {viewId: viewId})
+      bus.$emit('clear_panel_linkage', { viewId: viewId })
     },
     setMultiplexingStyleAdapt(state, value) {
       state.multiplexingStyleAdapt = value
+    },
+    setLastValidFilters(state, data) {
+      state.lastValidFilters[data.componentId] = data
+    },
+    resetLastValidFilters(state) {
+      state.lastValidFilters = {}
+    },
+    delLastValidFilterWithId(state, id) {
+      if (state.lastValidFilters[id]) {
+        delete state.lastValidFilters[id]
+      }
     }
   },
   modules: {
